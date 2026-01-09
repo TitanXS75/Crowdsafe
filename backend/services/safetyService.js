@@ -33,14 +33,14 @@ const calculateRouteSafety = (route, restrictedZones) => {
     score = Math.max(0, Math.min(100, score));
 
     // Label
-    let label = 'SAFE';
+    let label = 'LOW TRAFFIC';
     let color = 'green';
 
     if (score < 40) {
-        label = 'UNSAFE';
+        label = 'HIGH TRAFFIC';
         color = 'red';
     } else if (score < 75) {
-        label = 'MODERATE';
+        label = 'MODERATE TRAFFIC';
         color = 'yellow';
     }
 

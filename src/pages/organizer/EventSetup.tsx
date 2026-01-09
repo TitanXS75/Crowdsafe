@@ -77,8 +77,10 @@ export const EventSetup = () => {
     console.log("Is editing?", isEditing);
     console.log("Editing ID:", editingId);
     console.log("Current event data:", eventData);
+    console.log("User:", user?.uid);
 
     if (!eventData.name || !eventData.location || !eventData.startDate) {
+      console.log("❌ Missing required fields");
       toast({
         title: "Missing Information",
         description: "Please fill in event name, location, and start date.",
@@ -92,11 +94,10 @@ export const EventSetup = () => {
       if (isEditing && editingId) {
         // Update existing event
         console.log("🔄 UPDATING event with ID:", editingId);
-        console.log("📦 Data being sent:", eventData);
 
         // Make sure we're not sending the ID in the update data
         const { id, ...dataToUpdate } = eventData;
-        console.log("📤 Final payload (without id):", dataToUpdate);
+        console.log("📤 Update payload:", dataToUpdate);
 
         await updateEvent(editingId, dataToUpdate);
         console.log("✅ UPDATE COMPLETED!");
@@ -107,14 +108,18 @@ export const EventSetup = () => {
         });
       } else {
         // Create new event with organizer info
+        console.log("🆕 CREATING new event");
         const eventWithOrganizer = {
           ...eventData,
           organizerId: user?.uid || "",
           organizerEmail: user?.email || "",
           organizerName: userData?.orgName || userData?.name || "",
         };
-        console.log("Creating new event:", eventWithOrganizer);
-        await createEvent(eventWithOrganizer);
+        console.log("📤 Create payload:", eventWithOrganizer);
+
+        const newId = await createEvent(eventWithOrganizer);
+        console.log("✅ CREATE COMPLETED! New ID:", newId);
+
         toast({
           title: "Event Created!",
           description: "Your event has been saved successfully.",
@@ -130,19 +135,19 @@ export const EventSetup = () => {
       // Refresh events list
       console.log("🔄 Refreshing events...");
       const allEvents = await getEvents();
-      console.log("📋 All events:", allEvents.length);
       const myEvents = allEvents.filter(e => e.organizerId === user?.uid);
-      console.log("📋 My events:", myEvents.length);
       setEvents(myEvents);
       console.log("✅ Events refreshed!");
     } catch (error) {
-      console.error("Save error:", error);
+      console.error("❌ Save error stack:", error);
+      alert("Failed to save event. Check console for details: " + String(error));
       toast({
         title: "Error",
-        description: "Failed to save event.",
+        description: "Failed to save event. Check console for details.",
         variant: "destructive"
       });
     } finally {
+      console.log("=== SAVE finished ===");
       setLoading(false);
     }
   };

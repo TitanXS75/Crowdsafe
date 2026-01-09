@@ -9,9 +9,9 @@ import {
 import { AttendeeLayout } from "@/components/attendee/AttendeeLayout";
 import { getEvents, EventData, fetchRoutes, updateUserLocation } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import SafetyRouteSelector from "@/components/SafetyRouteSelector";
+// SafetyRouteSelector removed as per request for map-only UI
 import { useNavigate } from "react-router-dom";
-import InteractiveMap from "@/components/InteractiveMap";
+import { GoogleInteractiveMap } from "@/components/GoogleInteractiveMap";
 import { useToast } from "@/hooks/use-toast";
 
 export const AttendeeMap = () => {
@@ -39,14 +39,54 @@ export const AttendeeMap = () => {
     return [51.505, -0.09];
   };
 
-  // Simulate user location near the event center
+  // Load event from local storage on mount
   useEffect(() => {
-    if (event?.mapConfig?.center && !userLocation) {
-      const [lat, lng] = getSafeCenter(event.mapConfig.center);
-      // Start slightly offset
-      setUserLocation([lat - 0.005, lng - 0.005]);
+    const loadEvent = () => {
+      try {
+        const stored = localStorage.getItem("currentEvent");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setEvent(parsed);
+          setLoading(false);
+          console.log("✅ AttendeeMap: Loaded event:", parsed.name);
+        } else {
+          console.warn("⚠️ AttendeeMap: No event in localStorage");
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error("❌ AttendeeMap: Error parsing event", e);
+        setLoading(false);
+      }
+    };
+    loadEvent();
+  }, []);
+
+  // Real-time user location tracking
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      toast({ title: "Geolocation Failed", description: "Browser does not support geolocation", variant: "destructive" });
+      return;
     }
-  }, [event]);
+
+    const handleSuccess = (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords;
+      console.log(`📍 GPS Update: ${latitude} ${longitude}`);
+      setUserLocation([latitude, longitude]);
+    };
+
+    const handleError = (error: GeolocationPositionError) => {
+      console.error("Geolocation failed:", error.message);
+      toast({ title: "Location Error", description: error.message, variant: "destructive" });
+    };
+
+    const watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+      timeout: 10000
+    });
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
 
   // Cleanup when mode changes
   useEffect(() => {
@@ -54,46 +94,124 @@ export const AttendeeMap = () => {
       setCustomStart(null);
       if (!navigating) setDestination(null);
     } else {
-      // Stop live navigation if entering planning mode? 
-      // Or keep it separate? Let's pause live nav visual but keep state.
       setNavigating(false);
-      setDestination(null);
-      setRoutes([]); // Clear old routes
+      setRoutes([]);
     }
   }, [isPlanning]);
 
-  // Periodic visual update (re-fetching routes)
+  // HYBRID ROUTING LOGIC
   useEffect(() => {
     let interval: any;
-    const updateNav = async () => {
+
+    const calculateAndAnalyzeRoutes = async () => {
+      const fetchEvent = async () => {
+        const rawStored = localStorage.getItem("currentEvent");
+        console.log("🔍 AttendeeMap: Raw stored event:", rawStored);
+
+        const storedEvent = JSON.parse(rawStored || "null");
+        console.log("🔍 AttendeeMap: Parsed stored event:", storedEvent);
+
+        if (!storedEvent?.id) {
+          console.warn("⚠️ AttendeeMap: No valid event ID found in storage.");
+          setLoading(false);
+          return;
+        }
+
+        // Check if offline mode is enabled
+      }
       const effectiveStart = isPlanning ? customStart : userLocation;
-      // Use selected destination or default to map center (only for live nav fallback)
-      // For planning, we STRICTLY need a destination set by user.
       const effectiveEnd = destination;
 
-      if (event && effectiveStart && effectiveEnd) {
-        // 1. Update backend on location (only if real user location)
-        if (!isPlanning && userLocation) {
-          await updateUserLocation(userLocation[0], userLocation[1]);
+      if (!event || !effectiveStart || !effectiveEnd) return;
+
+      // 1. Update User Location (if tracking)
+      if (!isPlanning && userLocation) {
+        updateUserLocation(userLocation[0], userLocation[1]);
+      }
+
+      // 2. Client-Side: Get Paths from Google Directions Service
+      try {
+        const directionsService = new google.maps.DirectionsService();
+
+        // Helper to fetch routes
+        const getGoogleRoutes = async (mode: google.maps.TravelMode) => {
+          return await directionsService.route({
+            origin: { lat: effectiveStart[0], lng: effectiveStart[1] },
+            destination: { lat: effectiveEnd[0], lng: effectiveEnd[1] },
+            travelMode: mode,
+            provideRouteAlternatives: true,
+          });
+        };
+
+        let result;
+        try {
+          // First try WALKING
+          result = await getGoogleRoutes(google.maps.TravelMode.WALKING);
+        } catch (walkError: any) {
+          console.log("⚠️ Walking route failed. Error details:", walkError);
+          // Check for ZERO_RESULTS in various ways to be robust
+          const isZeroResults =
+            walkError?.code === 'ZERO_RESULTS' ||
+            (typeof walkError?.message === 'string' && walkError.message.includes('ZERO_RESULTS')) ||
+            (walkError?.toString && walkError.toString().includes('ZERO_RESULTS'));
+
+          if (isZeroResults) {
+            console.log("🚶➡️🚗 Switching to DRIVING mode due to distance...");
+            toast({ title: "Walking Path Not Found", description: "Distance is too far. Calculating driving route..." });
+            try {
+              result = await getGoogleRoutes(google.maps.TravelMode.DRIVING);
+            } catch (driveError: any) {
+              console.error("🚗 Driving route also failed:", driveError);
+              throw new Error("No route found (walking or driving). Please check points.");
+            }
+          } else {
+            throw walkError;
+          }
         }
 
-        // 2. Fetch fresh routes
-        const freshRoutes = await fetchRoutes(effectiveStart, effectiveEnd, event.id!);
-
-        // Keep selected route if it still exists, else pick top
-        setRoutes(freshRoutes);
-        if (!selectedRouteId && freshRoutes.length > 0) {
-          setSelectedRouteId(freshRoutes[0].id);
+        if (!result || !result.routes || result.routes.length === 0) {
+          toast({ title: "No Routes Found", description: "Could not find a path between these points.", variant: "destructive" });
+          return;
         }
+
+        // 3. Transform for Backend Analysis
+        const candidateRoutes = result.routes.map((r, idx) => {
+          // Extract full path geometry as [[lat, lng], ...]
+          const overviewPath = r.overview_path.map(p => [p.lat(), p.lng()]);
+          const leg = r.legs[0];
+
+          return {
+            id: `g-route-${idx}`, // temporary ID
+            geometry: overviewPath,
+            distance: leg?.distance?.value || 0,
+            duration: Math.ceil((leg?.duration?.value || 0) / 60),
+            summary: r.summary
+          };
+        });
+
+        // 4. Backend: Analyze Crowd Density for these specific paths
+        // We import analyzeRoutes from db.ts (assumed added)
+        const { analyzeRoutes } = await import("@/lib/db");
+        const analyzedRoutes = await analyzeRoutes(candidateRoutes, event.id!);
+
+        setRoutes(analyzedRoutes);
+
+        // Auto-select first if none selected
+        if (!selectedRouteId && analyzedRoutes.length > 0) {
+          setSelectedRouteId(analyzedRoutes[0].id);
+        }
+
+      } catch (error: any) {
+        console.error("Routing Error:", error);
+        toast({ title: "Routing Error", description: error?.message || "Could not calculate route.", variant: "destructive" });
       }
     };
 
-    if (navigating || (isPlanning && customStart && destination)) {
-      updateNav(); // Immediate
-      // Only auto-refresh if live navigating? 
-      // Planning routes shouldn't change wildly unless crowd changes. Let's refresh slower or not at all?
-      // Let's refresh to show crowd updates.
-      interval = setInterval(updateNav, 5000);
+    if (navigating || (isPlanning && customStart && destination) || (!isPlanning && destination && userLocation)) {
+      calculateAndAnalyzeRoutes();
+      // Poll for CROWD updates (re-analyze), but maybe not re-calculate geometry every time to save API quota?
+      // For now, simple polling is fine.
+      interval = setInterval(calculateAndAnalyzeRoutes, 10000);
     }
 
     return () => clearInterval(interval);
@@ -104,157 +222,66 @@ export const AttendeeMap = () => {
   // Handle Map Clicks
   const handleMapClick = (latlng: [number, number]) => {
     if (isPlanning) {
+      // Planning Mode: Only set if null
       if (!customStart) {
         setCustomStart(latlng);
-        toast({ title: "Start Point Set", description: "Now tap for Destination." });
+        toast({ title: "Start Point Set", description: "Now set Destination." });
       } else if (!destination) {
         setDestination(latlng);
         toast({ title: "Destination Set", description: "Calculating routes..." });
       } else {
-        // Cycle? Or just update destination?
-        // Let's update destination to match standard UX
+        // Both set -> Ignore click to prevent accidental change
+        toast({ title: "Points Locked", description: "Click 'Change' to pick new points." });
+      }
+    } else {
+      // Live Mode: Only set dest if null
+      if (!destination) {
         setDestination(latlng);
+        toast({ title: "Destination Set", description: "Tap 'Start Navigation' to begin." });
+      } else {
+        toast({ title: "Destination Locked", description: "Click 'Change' to pick a new destination." });
       }
-    } else {
-      // Standard Mode: Tap to Navigate essentially just sets destination?
-      // Or "Navigate Here" via marker is preferred. 
-      // Let's allow tap to set destination for live nav too if logical.
-      // But usually map click does nothing in standard mode unless on POI.
-    }
-  };
-
-  const handleNavigate = (location: [number, number]) => {
-    setDestination(location);
-
-    if (isPlanning) {
-      // If planning, we just need destination. Start is already set or waiting.
-      // If start missing, user can tap or we could default to something? 
-      // Better to ask for start.
-      if (!customStart) {
-        toast({ title: "Destination Set", description: "Now select a Start Point." });
-      }
-    } else {
-      if (!navigating) {
-        startNavigation();
-      }
-      toast({
-        title: "Destination Set",
-        description: "Recalculating routes to selected location.",
-      });
     }
   };
 
   const startNavigation = () => {
-    console.log("startNavigation called", { event });
-    if (!event) {
-      console.error("Event is missing");
+    if (!destination) {
+      toast({ title: "No Destination", description: "Please select a destination first." });
       return;
     }
+    setNavigating(true);
+    toast({ title: "Navigation Started", description: "Follow the route to your destination." });
+    // Force immediate recalc
+    // calculateAndAnalyzeRoutes call happens in effect
+  };
 
-    // ... (Geolocation logic remains same) ...
-    const handleSuccess = (pos: GeolocationPosition) => {
-      const { latitude, longitude } = pos.coords;
-      setUserLocation([latitude, longitude]);
-      setNavigating(true);
-      setIsPlanning(false); // Ensure we exit planning logic
-      toast({
-        title: "Navigation Started",
-        description: "Using your current location.",
-      });
-    };
-
-    const handleError = (error: GeolocationPositionError) => {
-      console.warn("Geolocation failed:", error.message);
-      // Fallback
-      const center = getSafeCenter(event.mapConfig?.center);
-      if (center) {
-        const [lat, lng] = center;
-        setUserLocation([lat - 0.005, lng - 0.005]);
-        setNavigating(true);
-        setIsPlanning(false);
-        toast({
-          title: "Location Unavailable",
-          description: "Using simulated location.",
-          variant: "default"
-        });
-      }
-    };
-
-    if (navigator.geolocation) {
-      toast({ title: "Getting Location...", description: "Please allow location access." });
-      navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0
-      });
+  const handleNavigate = (location: [number, number]) => {
+    // POI navigation - force overwrite or ask?
+    // User specifically clicked "Navigate Here" on a POI, so we should allow it.
+    if (isPlanning && customStart && destination) {
+      // Ask user or just overwrite dest? Le's overwrite dest logic but clear it first
+      setDestination(location);
     } else {
-      handleError({ code: 0, message: "Geolocation not supported", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as any);
+      setDestination(location);
     }
   };
 
-  // ... (fetchEvent useEffect remains same) ...
-  useEffect(() => {
-    const fetchEvent = async () => {
-      const storedEvent = JSON.parse(localStorage.getItem("currentEvent") || "null");
-      if (!storedEvent?.id) {
-        setLoading(false);
-        return;
-      }
+  const handleClearStart = () => {
+    setCustomStart(null);
+    setRoutes([]);
+  };
 
-      // Check if offline mode is enabled
-      const offlineMode = localStorage.getItem("offlineMode") === "true";
-      const mapDataCached = localStorage.getItem("mapDataCached") === "true";
-
-      if (offlineMode && mapDataCached) {
-        // Use cached offline data
-        const offlineData = JSON.parse(localStorage.getItem("offlineEventData") || "{}");
-        if (offlineData.event && offlineData.event.id === storedEvent.id) {
-          console.log("📴 Using offline cached map data");
-          setEvent(offlineData.event);
-          setLoading(false);
-          toast({
-            title: "Offline Mode",
-            description: "Using cached map data (offline).",
-          });
-          return;
-        }
-      }
-
-      // Online mode or no cached data - fetch from Firebase
-      try {
-        const allEvents = await getEvents();
-        const freshEvent = allEvents.find(e => e.id === storedEvent.id);
-        if (freshEvent) {
-          setEvent(freshEvent);
-          localStorage.setItem("currentEvent", JSON.stringify(freshEvent));
-        } else {
-          setEvent(storedEvent);
-        }
-      } catch (error) {
-        console.error("Error fetching event:", error);
-        // Fallback to stored event if online fetch fails
-        setEvent(storedEvent);
-        toast({
-          title: "Using Cached Data",
-          description: "Could not fetch latest event data.",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEvent();
-  }, []);
+  const handleClearDest = () => {
+    setDestination(null);
+    setRoutes([]);
+    setSelectedRouteId(null);
+    if (navigating) {
+      setNavigating(false); // Stop nav if dest cleared?
+    }
+  };
 
 
-  if (loading) {
-    return (
-      <AttendeeLayout>
-        <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
-          <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
-      </AttendeeLayout>
-    );
-  }
+  // ...
 
   return (
     <AttendeeLayout>
@@ -265,6 +292,7 @@ export const AttendeeMap = () => {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
+          {/* ... Title Block ... */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl lg:text-2xl font-bold text-foreground">Navigation Map</h1>
@@ -274,85 +302,74 @@ export const AttendeeMap = () => {
             </div>
             {event && (
               <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant={isPlanning ? "ghost" : "default"}
-                  onClick={() => {
-                    setIsPlanning(false);
-                    // Maybe auto-start nav? Or just reset.
-                  }}
-                >
-                  Live Nav
-                </Button>
-                <Button
-                  size="sm"
-                  variant={isPlanning ? "default" : "outline"}
-                  onClick={() => setIsPlanning(true)}
-                >
-                  Trip Planner
-                </Button>
+                <Button size="sm" variant={isPlanning ? "ghost" : "default"} onClick={() => setIsPlanning(false)}>Live Nav</Button>
+                <Button size="sm" variant={isPlanning ? "default" : "outline"} onClick={() => setIsPlanning(true)}>Trip Planner</Button>
               </div>
             )}
           </div>
 
           {/* Mode Specific Controls */}
-          {!isPlanning && event && !navigating && (
-            <div className="flex gap-2 mt-2">
-              <Button size="sm" onClick={startNavigation}>Start Navigation</Button>
-              <Button size="sm" variant="outline" onClick={() => {
-                console.log("Forcing simulation");
-                const center = getSafeCenter(event.mapConfig?.center);
-                setUserLocation([center[0] - 0.005, center[1] - 0.005]);
-                setNavigating(true);
-              }}>Simulate</Button>
+          {!isPlanning && event && (
+            <div className="flex flex-col gap-2 p-3 bg-muted/50 rounded-lg border">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium">Destination</div>
+                {destination ? (
+                  <Button variant="ghost" size="sm" className="h-6 text-blue-500 hover:text-blue-700 px-2" onClick={handleClearDest}>
+                    Change
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Tap map to set</span>
+                )}
+              </div>
+
+              {destination ? (
+                <div className="flex items-center justify-between bg-background p-2 rounded border">
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="w-4 h-4 text-red-500" />
+                    <span>Custom Pin</span>
+                  </div>
+                  {!navigating && <Button size="sm" onClick={startNavigation}>Start</Button>}
+                  {navigating && <span className="text-xs text-green-600 animate-pulse font-bold">Navigating...</span>}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground italic pl-1">None selected</div>
+              )}
             </div>
           )}
 
           {isPlanning && (
             <div className="bg-muted/50 p-2 rounded-lg border text-sm flex flex-col gap-2">
               <div className="font-semibold text-primary">Trip Planner Mode</div>
-              <div className="grid grid-cols-[auto_1fr] gap-2 items-center">
-                <div className="text-muted-foreground">Start:</div>
-                <div className="flex items-center justify-between bg-background px-2 py-1 rounded border">
-                  <span>{customStart ? `${customStart[0].toFixed(4)}, ...` : "Tap on map"}</span>
-                  {customStart && <MapPin className="w-3 h-3 text-green-500" />}
-                </div>
 
-                <div className="text-muted-foreground">End:</div>
-                <div className="flex items-center justify-between bg-background px-2 py-1 rounded border">
-                  <span>{destination ? `${destination[0].toFixed(4)}, ...` : "Tap or select POI"}</span>
-                  {destination && <MapPin className="w-3 h-3 text-red-500" />}
+              {/* Start Point */}
+              <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
+                <div className="text-muted-foreground w-10">Start:</div>
+                <div className="flex items-center gap-2 bg-background px-2 py-1 rounded border overflow-hidden">
+                  <MapPin className="w-3 h-3 text-green-500 shrink-0" />
+                  <span className="truncate">{customStart ? `${customStart[0].toFixed(4)}, ...` : "Tap on map"}</span>
                 </div>
+                {customStart && <Button variant="ghost" size="sm" className="h-6 px-2 text-blue-500" onClick={handleClearStart}>Change</Button>}
               </div>
-              <div className="text-xs text-muted-foreground flex justify-between">
-                <span>{routes.length > 0 ? `${routes.length} routes found` : "Select points to view routes"}</span>
-                <Button variant="link" size="sm" className="h-auto p-0 text-destructive" onClick={() => {
-                  setCustomStart(null);
-                  setDestination(null);
-                  setRoutes([]);
-                }}>Clear All</Button>
-              </div>
-            </div>
-          )}
 
-          {navigating && !isPlanning && (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2 text-primary animate-pulse">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Live Routing Active
-                {destination && <span className="text-xs text-muted-foreground">(Custom Destination)</span>}
+              {/* End Point */}
+              <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
+                <div className="text-muted-foreground w-10">End:</div>
+                <div className="flex items-center gap-2 bg-background px-2 py-1 rounded border overflow-hidden">
+                  <MapPin className="w-3 h-3 text-red-500 shrink-0" />
+                  <span className="truncate">{destination ? `${destination[0].toFixed(4)}, ...` : "Tap on map"}</span>
+                </div>
+                {destination && <Button variant="ghost" size="sm" className="h-6 px-2 text-blue-500" onClick={handleClearDest}>Change</Button>}
               </div>
-              {destination && (
-                <Button variant="link" className="h-auto p-0 text-xs text-destructive" onClick={() => setDestination(null)}>
-                  Clear Destination
-                </Button>
-              )}
+
+              <div className="text-xs text-muted-foreground pt-1">
+                {routes.length > 0 ? `${routes.length} routes found` : "Set both points to view routes"}
+              </div>
             </div>
           )}
         </motion.div>
 
         {/* Map container */}
-        <div className="flex-1 relative rounded-xl overflow-hidden border border-border bg-muted/30">
+        <div className="flex-1 relative rounded-xl overflow-hidden border border-border bg-gray-100 dark:bg-gray-800 min-h-[400px]">
           {!event ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
               <AlertCircle className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
@@ -365,7 +382,7 @@ export const AttendeeMap = () => {
               </Button>
             </div>
           ) : event.mapConfig ? (
-            <InteractiveMap
+            <GoogleInteractiveMap
               config={event.mapConfig}
               facilities={event.facilities}
               routes={routes}
@@ -377,6 +394,8 @@ export const AttendeeMap = () => {
                 start: isPlanning ? (customStart || undefined) : undefined,
                 end: isPlanning ? (destination || undefined) : undefined
               }}
+              apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+              userLocation={userLocation}
             />
           ) : event.mapEmbedUrl ? (
             <iframe
@@ -420,13 +439,33 @@ export const AttendeeMap = () => {
         <div>Routes: {routes.length}</div>
       </div>
 
-      {/* Route Selector */}
-      {(isPlanning || navigating) && routes.length > 0 && (
-        <SafetyRouteSelector
-          routes={routes}
-          selectedRouteId={selectedRouteId}
-          onSelect={setSelectedRouteId}
-        />
+      {/* Route Info Overlay (Floating Card for Selected Route) */}
+      {(isPlanning || navigating) && selectedRouteId && routes.length > 0 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/95 backdrop-blur shadow-lg p-3 rounded-xl border w-[90%] max-w-sm z-[1000] flex items-center justify-between">
+          {(() => {
+            const route = routes.find(r => r.id === selectedRouteId);
+            if (!route) return null;
+            const colorMap: any = { green: "text-green-600", yellow: "text-yellow-600", red: "text-red-600" };
+            const textColor = colorMap[route.safety?.color] || "text-blue-600";
+
+            return (
+              <>
+                <div className="flex flex-col">
+                  <div className="font-bold text-sm flex items-center gap-2">
+                    <span className={textColor}>{route.safety?.label || "Route"}</span>
+                    <span className="text-muted-foreground text-xs">• {route.duration} min</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {route.distance}m • {route.summary}
+                  </div>
+                </div>
+                <Button size="sm" onClick={startNavigation}>
+                  {navigating ? "Update" : "Go"}
+                </Button>
+              </>
+            );
+          })()}
+        </div>
       )}
     </AttendeeLayout>
   );

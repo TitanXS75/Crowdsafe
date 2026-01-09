@@ -42,8 +42,8 @@ export interface EventData {
     mapConfig?: {
         center: [number, number];
         zoom: number;
-        boundaries: [number, number][];
-        restrictedZones: [number, number][];
+        boundaries: any[]; // Changed from [number, number][] to allow multi-polygon (array of arrays)
+        restrictedZones: any[];
         routes: any[];
     };
     facilities?: EventPOI[];
@@ -59,33 +59,85 @@ const API_URL = 'http://localhost:5000/api';
 // Helper to convert nested arrays to objects for Firestore compatibility
 // Firestore doesn't support nested arrays like [number, number][]
 const convertMapConfigForFirestore = (eventData: EventData): any => {
+    console.log("🛠️ Converting config for Firestore:", eventData.mapConfig);
     if (!eventData.mapConfig) return eventData;
 
-    const convertCoords = (coords: [number, number][] | undefined) =>
-        coords?.map(([lat, lng]) => ({ lat, lng })) || [];
+    // Helper: [number, number][] -> {lat, lng}[]
+    const convertPoly = (coords: any[]) => {
+        if (!coords) return [];
+        // Check if it's already {lat, lng} (shallow check)
+        if (coords.length > 0 && coords[0].lat !== undefined) return coords;
 
-    return {
+        return coords.map((pt) => {
+            // Handle if pt is [lat, lng] or {lat, lng}
+            if (Array.isArray(pt)) return { lat: pt[0], lng: pt[1] };
+            return pt;
+        });
+    };
+
+    // Updated Convert: Handle Array of Polygons
+    const convertBoundaries = (boundaries: any[]) => {
+        if (!boundaries || boundaries.length === 0) return [];
+
+        // Check format:
+        // Single Polygon (Array of Coords) -> boundaries[0] is coordinate (array or object)
+        // Multi Polygon (Array of Arrays/Polygons) -> boundaries[0] is array of coords
+
+        // Deep check for Multi vs Single
+        // If boundaries[0] is an array of numbers (e.g. [lat, lng]), then it is a single point -> Single Polygon
+        // If boundaries[0] is an array of arrays (e.g. [[lat,lng]]), then it is a polygon -> Multi Polygon
+
+        const firstItem = boundaries[0];
+        const isMulti = Array.isArray(firstItem) && (Array.isArray(firstItem[0]) || typeof firstItem[0] === 'object');
+
+        // Also check if already wrapped (from verify or re-save)
+        if (firstItem && firstItem.path) return boundaries; // Already in Firestore format
+
+        if (!isMulti) {
+            // Single polygon (array of coords) -> allowed in Firestore as Array of Objects {lat,lng}
+            return convertPoly(boundaries);
+        }
+
+        // Multi polygon: Nested arrays NOT allowed. Wrap in object.
+        return boundaries.map(poly => ({
+            path: convertPoly(poly)
+        }));
+    };
+
+    const result = {
         ...eventData,
         mapConfig: {
             ...eventData.mapConfig,
             center: eventData.mapConfig.center
                 ? { lat: eventData.mapConfig.center[0], lng: eventData.mapConfig.center[1] }
                 : null,
-            boundaries: convertCoords(eventData.mapConfig.boundaries),
-            restrictedZones: convertCoords(eventData.mapConfig.restrictedZones),
+            boundaries: convertBoundaries(eventData.mapConfig.boundaries),
+            restrictedZones: convertBoundaries(eventData.mapConfig.restrictedZones),
         },
-        // Also convert facilities location if present
         facilities: eventData.facilities?.map(f => ({
             ...f,
             location: f.location ? { lat: f.location[0], lng: f.location[1] } : null
         }))
     };
+
+    // Remove undefined fields to prevent Firestore errors
+    Object.keys(result).forEach(key => {
+        if (result[key as keyof typeof result] === undefined) {
+            delete result[key as keyof typeof result];
+        }
+    });
+
+    return result;
 };
 
 export const createEvent = async (eventData: EventData) => {
     try {
         console.log("Creating event with data:", eventData);
-        const firestoreData = convertMapConfigForFirestore(eventData);
+        let firestoreData = convertMapConfigForFirestore(eventData);
+
+        // Ensure no undefined values
+        firestoreData = JSON.parse(JSON.stringify(firestoreData));
+
         const docRef = await addDoc(collection(db, "events"), {
             ...firestoreData,
             createdAt: new Date()
@@ -107,8 +159,24 @@ export const updateEvent = async (id: string, data: Partial<EventData>) => {
         console.log("Data before conversion:", data);
 
         const docRef = doc(db, "events", id);
-        // Convert nested arrays if mapConfig or facilities are being updated
-        const firestoreData = convertMapConfigForFirestore(data as EventData);
+        let firestoreData = convertMapConfigForFirestore(data as EventData);
+
+        // Ensure no undefined values. 
+        // Note: JSON.stringify removes undefined, but converts Date to string. 
+        // 'data' might have Date objects? No, EventData uses string for dates, but createdAt is Date.
+        // If we are updating, we usually don't touch createdAt.
+        // Safe to use JSON parse/stringify for now or just the manual cleanup.
+        // Let's use the manual cleanup from convertMapConfigForFirestore + extra checks
+        // Actually, JSON.stringify is safest for nested undefineds, but we need to preserve Dates if any.
+        // createEvent sets createdAt manually. updateEvent doesn't usually set dates.
+
+        // Let's use a shallow clean for the top level objects at least
+        const cleanData = (obj: any) => {
+            Object.keys(obj).forEach(key => (obj[key] === undefined ? delete obj[key] : {}));
+            return obj;
+        };
+        firestoreData = cleanData(firestoreData);
+
         console.log("Data after Firestore conversion:", firestoreData);
 
         await updateDoc(docRef, firestoreData);
@@ -129,12 +197,15 @@ export const deleteEvent = async (id: string) => {
     }
 };
 
-// Helper to convert Firestore objects back to arrays for Leaflet compatibility
-// Firestore stores {lat, lng} but Leaflet expects [lat, lng]
+// ...
+
+// Helper to convert Firestore objects back to arrays for Leaflet/Google compatibility
+// Firestore stores {lat, lng} but config expects [lat, lng] or [lat, lng][]
 const convertMapConfigFromFirestore = (eventData: any): EventData => {
+    // console.log("📥 Converting config FROM Firestore:", eventData.mapConfig);
     if (!eventData.mapConfig) return eventData;
 
-    const convertToArray = (coords: any[] | undefined): [number, number][] => {
+    const convertPoly = (coords: any[] | undefined): [number, number][] => {
         if (!coords || !Array.isArray(coords)) return [];
         return coords.map((c: any) => {
             if (Array.isArray(c)) return c as [number, number];
@@ -144,6 +215,32 @@ const convertMapConfigFromFirestore = (eventData: any): EventData => {
             return [0, 0] as [number, number]; // fallback
         }).filter(c => c[0] !== 0 || c[1] !== 0); // filter out invalid
     };
+
+    const convertBoundaries = (stored: any[]): [number, number][][] => {
+        if (!stored) return [];
+        if (stored.length === 0) return [];
+
+        // console.log("📥 Converting boundaries FROM:", stored);
+
+        // Detect if stored is Single ([{lat,lng}...]) or Multi ([ [{lat,lng}...], ... ])
+        // or the new wrapper format? Let's just assume Array of Arrays if possible, or Array of Objects.
+
+        // If first item has lat/lng directly, it's a single polygon (legacy)
+        if (stored[0].lat !== undefined || (Array.isArray(stored[0]) && typeof stored[0][0] === 'number')) {
+            // console.log("-> Detected Single Polygon (Legacy)");
+            return [convertPoly(stored)];
+        }
+
+        // New Multi Polygon (Wrapper)
+        if (stored[0].path !== undefined) {
+            // console.log("-> Detected Multi Polygon (Wrapper Object)");
+            return stored.map((wrapper: any) => convertPoly(wrapper.path));
+        }
+
+        // Else it is an array of polygons (e.g. from JSON or legacy nested)
+        // console.log("-> Detected Multi Polygon (Nested Array)");
+        return stored.map(poly => convertPoly(poly));
+    }
 
     const convertCenter = (center: any): [number, number] | undefined => {
         if (!center) return undefined;
@@ -159,8 +256,8 @@ const convertMapConfigFromFirestore = (eventData: any): EventData => {
         mapConfig: {
             ...eventData.mapConfig,
             center: convertCenter(eventData.mapConfig.center),
-            boundaries: convertToArray(eventData.mapConfig.boundaries),
-            restrictedZones: convertToArray(eventData.mapConfig.restrictedZones),
+            boundaries: convertBoundaries(eventData.mapConfig.boundaries) as any, // Cast to any to satisfy TS recursive generic issues if any
+            restrictedZones: convertBoundaries(eventData.mapConfig.restrictedZones) as any,
         },
         facilities: eventData.facilities?.map((f: any) => ({
             ...f,
@@ -204,6 +301,21 @@ export const fetchRoutes = async (start: [number, number], end: [number, number]
     } catch (error) {
         console.error("Error fetching routes:", error);
         return [];
+    }
+};
+
+export const analyzeRoutes = async (routes: any[], eventId: string) => {
+    try {
+        const response = await fetch(`${API_URL}/navigation/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ routes, eventId })
+        });
+        const result = await response.json();
+        return result.data;
+    } catch (error) {
+        console.error("Error analyzing routes:", error);
+        return routes; // Return original routes on failure
     }
 };
 
