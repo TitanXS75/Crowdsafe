@@ -269,9 +269,15 @@ export interface AlertData {
 
 // Get all alerts (real-time listener)
 export const getAlerts = (callback: (alerts: AlertData[]) => void) => {
-    const q = query(collection(db, "alerts"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "alerts")); // Removed orderBy to avoid index error
     return onSnapshot(q, (snapshot) => {
         const alerts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AlertData[];
+        // Sort in memory
+        alerts.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+        });
         callback(alerts);
     });
 };
@@ -280,11 +286,16 @@ export const getAlerts = (callback: (alerts: AlertData[]) => void) => {
 export const getActiveAlerts = (callback: (alerts: AlertData[]) => void) => {
     const q = query(
         collection(db, "alerts"),
-        where("active", "==", true),
-        orderBy("createdAt", "desc")
-    );
+        where("active", "==", true)
+    ); // Removed orderBy to avoid index error
     return onSnapshot(q, (snapshot) => {
         const alerts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AlertData[];
+        // Sort in memory
+        alerts.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+        });
         callback(alerts);
     });
 };
