@@ -21,10 +21,18 @@ export const AttendeeAlerts = () => {
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
   useEffect(() => {
+    const storedEvent = JSON.parse(localStorage.getItem("currentEvent") || "null");
+
     const unsubscribe = getActiveAlerts((alerts) => {
-      // Add 'read' status - in production, this would be stored per-user
+      // Filter for current event and EXCLUDE emergencies
+      const relevantAlerts = alerts.filter(a =>
+        a.eventId === storedEvent?.id &&
+        a.type !== "emergency"
+      );
+
+      // Add 'read' status
       const readAlerts = JSON.parse(localStorage.getItem('readAlerts') || '[]');
-      const alertsWithRead = alerts.map(a => ({
+      const alertsWithRead = relevantAlerts.map(a => ({
         ...a,
         read: readAlerts.includes(a.id),
         time: a.time ? new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'

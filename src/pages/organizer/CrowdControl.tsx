@@ -14,22 +14,20 @@ import { OrganizerLayout } from "@/components/organizer/OrganizerLayout";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-const initialRoutes = [
-  { id: 1, name: "Main Entrance → Stage A", status: "open", crowd: "--" },
-  { id: 2, name: "Gate 2 → Food Court", status: "open", crowd: "--" },
-  { id: 3, name: "Parking A → Main Entrance", status: "open", crowd: "--" },
-  { id: 4, name: "Stage A → Stage B (Direct)", status: "open", crowd: "--" },
-  { id: 5, name: "Stage A → Stage B (Alternative)", status: "open", crowd: "--" },
-  { id: 6, name: "Food Court → Exit Gate 3", status: "open", crowd: "--" },
-];
+const initialRoutes: {
+  id: number;
+  name: string;
+  status: string;
+  crowd: string;
+}[] = [];
 
-const zones = [
-  { id: 1, name: "Zone A - Main Stage", crowd: 0, capacity: 2000, current: 0 },
-  { id: 2, name: "Zone B - Food Court", crowd: 0, capacity: 1000, current: 0 },
-  { id: 3, name: "Zone C - Rest Area", crowd: 0, capacity: 800, current: 0 },
-  { id: 4, name: "Zone D - Secondary Stage", crowd: 0, capacity: 1500, current: 0 },
-  { id: 5, name: "Zone E - Parking", crowd: 0, capacity: 500, current: 0 },
-];
+const zones: {
+  id: number;
+  name: string;
+  crowd: number;
+  capacity: number;
+  current: number;
+}[] = [];
 
 export const CrowdControl = () => {
   const [routes, setRoutes] = useState(initialRoutes);
@@ -242,8 +240,6 @@ export const CrowdControl = () => {
                 {/* Simulated heatmap zones */}
                 {/* Heatmap cleared */}
                 <div className="absolute inset-0">
-                  <div className="absolute w-32 h-32 bg-secondary/10 rounded-full blur-xl" style={{ left: "30%", top: "25%" }} />
-                  <div className="absolute w-24 h-24 bg-secondary/10 rounded-full blur-xl" style={{ left: "60%", top: "40%" }} />
                 </div>
 
                 {/* Legend */}

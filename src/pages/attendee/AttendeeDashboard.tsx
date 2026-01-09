@@ -206,14 +206,23 @@ export const AttendeeDashboard = () => {
   // Fetch real-time alerts
   useEffect(() => {
     const unsubscribe = getActiveAlerts((alerts) => {
-      if (alerts.length > 0) {
-        setLatestAlert(alerts[0]); // Get the most recent alert
+      // Filter alerts for current event
+      const eventAlerts = alerts.filter(a => a.eventId === currentEvent?.id);
+
+      if (eventAlerts.length > 0) {
+        // Prioritize emergency alerts
+        const emergency = eventAlerts.find(a => a.type === "emergency");
+        if (emergency) {
+          setLatestAlert(emergency);
+        } else {
+          setLatestAlert(eventAlerts[0]); // Get the most recent alert
+        }
       } else {
         setLatestAlert(null);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentEvent]);
 
   const currentCrowd = crowdLevels[crowdLevel];
 
@@ -300,38 +309,61 @@ export const AttendeeDashboard = () => {
 
         {/* Alert Banner */}
         {latestAlert && (
+          {/* Alert Banner - Emergency vs Standard */ }
+        {latestAlert && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <NavLink to="/attendee/alerts">
-              <Card className={`cursor-pointer transition-all hover:shadow-md ${latestAlert.severity === 'critical' ? 'bg-destructive/10 border-destructive/30' :
-                latestAlert.severity === 'warning' ? 'bg-amber-500/10 border-amber-500/30' :
-                  'bg-primary/10 border-primary/30'
-                }`}>
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${latestAlert.severity === 'critical' ? 'bg-destructive' :
-                    latestAlert.severity === 'warning' ? 'bg-amber-500' :
-                      'bg-primary'
-                    }`}>
-                    {latestAlert.severity === 'critical' ? (
-                      <AlertTriangle className="w-4 h-4 text-white" />
-                    ) : latestAlert.severity === 'warning' ? (
-                      <AlertCircle className="w-4 h-4 text-white" />
-                    ) : (
-                      <Info className="w-4 h-4 text-white" />
-                    )}
+            {latestAlert.type === 'emergency' ? (
+              // EMERGENCY BLOCK
+              <Card className="bg-destructive border-destructive text-destructive-foreground animate-pulse">
+                <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center animate-bounce">
+                    <AlertTriangle className="w-8 h-8 text-white" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">{latestAlert.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{latestAlert.message}</p>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold uppercase tracking-wider">{latestAlert.title}</h2>
+                    <p className="text-lg font-medium opacity-90">{latestAlert.message}</p>
                   </div>
-                  <Bell className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <div className="w-full h-1 bg-white/20 rounded-full my-2" />
+                  <p className="text-sm font-semibold uppercase tracking-widest opacity-75">
+                    Follow Official Instructions Immediately
+                  </p>
                 </CardContent>
               </Card>
-            </NavLink>
+            ) : (
+              // Standard Alert Banner
+              <NavLink to="/attendee/alerts">
+                <Card className={`cursor-pointer transition-all hover:shadow-md ${latestAlert.severity === 'critical' ? 'bg-destructive/10 border-destructive/30' :
+                  latestAlert.severity === 'warning' ? 'bg-amber-500/10 border-amber-500/30' :
+                    'bg-primary/10 border-primary/30'
+                  }`}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${latestAlert.severity === 'critical' ? 'bg-destructive' :
+                      latestAlert.severity === 'warning' ? 'bg-amber-500' :
+                        'bg-primary'
+                      }`}>
+                      {latestAlert.severity === 'critical' ? (
+                        <AlertTriangle className="w-4 h-4 text-white" />
+                      ) : latestAlert.severity === 'warning' ? (
+                        <AlertCircle className="w-4 h-4 text-white" />
+                      ) : (
+                        <Info className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-foreground truncate">{latestAlert.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{latestAlert.message}</p>
+                    </div>
+                    <Bell className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  </CardContent>
+                </Card>
+              </NavLink>
+            )}
           </motion.div>
         )}
+
 
         {/* Status cards */}
         <motion.div
@@ -434,41 +466,7 @@ export const AttendeeDashboard = () => {
 
         {/* Active alerts - HIDDEN IF NONE */}
         {/* Active alerts */}
-        {latestAlert && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <Card className={`border-l-4 ${latestAlert.severity === 'critical' ? 'border-destructive bg-destructive/5' :
-                latestAlert.severity === 'warning' ? 'border-amber-500 bg-amber-500/5' :
-                  'border-primary bg-primary/5'
-              }`}>
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${latestAlert.severity === 'critical' ? 'bg-destructive/20' :
-                      latestAlert.severity === 'warning' ? 'bg-amber-500/20' :
-                        'bg-primary/20'
-                    }`}>
-                    <AlertTriangle className={`w-5 h-5 ${latestAlert.severity === 'critical' ? 'text-destructive' :
-                        latestAlert.severity === 'warning' ? 'text-amber-500' :
-                          'text-primary'
-                      }`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-foreground">{latestAlert.title}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {latestAlert.message}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <NavLink to="/attendee/alerts">View All</NavLink>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+
 
         {/* Nearby facilities */}
         <motion.div
