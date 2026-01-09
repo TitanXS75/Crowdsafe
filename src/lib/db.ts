@@ -59,20 +59,12 @@ const API_URL = 'http://localhost:5000/api';
 
 export const createEvent = async (eventData: EventData) => {
     try {
-        const response = await fetch(`${API_URL}/events`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(eventData),
+        const docRef = await addDoc(collection(db, "events"), {
+            ...eventData,
+            createdAt: new Date()
         });
-
-        if (!response.ok) {
-            throw new Error('Failed to create event');
-        }
-
-        const result = await response.json();
-        return result.data.id;
+        console.log("Event created with ID: ", docRef.id);
+        return docRef.id;
     } catch (e) {
         console.error("Error creating event: ", e);
         throw e;
@@ -81,17 +73,8 @@ export const createEvent = async (eventData: EventData) => {
 
 export const updateEvent = async (id: string, data: Partial<EventData>) => {
     try {
-        const response = await fetch(`${API_URL}/events/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data),
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to update event');
-        }
+        const docRef = doc(db, "events", id);
+        await updateDoc(docRef, data);
         console.log("Event updated with ID: ", id);
     } catch (e) {
         console.error("Error updating event: ", e);
@@ -101,13 +84,7 @@ export const updateEvent = async (id: string, data: Partial<EventData>) => {
 
 export const deleteEvent = async (id: string) => {
     try {
-        const response = await fetch(`${API_URL}/events/${id}`, {
-            method: 'DELETE',
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to delete event');
-        }
+        await deleteDoc(doc(db, "events", id));
         console.log("Event deleted with ID: ", id);
     } catch (e) {
         console.error("Error deleting event: ", e);
