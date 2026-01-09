@@ -20,7 +20,6 @@ import {
     Trash2,
     Check
 } from "lucide-react";
-import { Toggle } from "@/components/ui/toggle";
 
 // Fix for default Leaflet marker icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -50,6 +49,10 @@ const MapController = ({ onMapReady }: { onMapReady: (map: L.Map) => void }) => 
 const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEditorProps) => {
     const [map, setMap] = useState<L.Map | null>(null);
     const featureGroupRef = useRef<L.FeatureGroup | null>(null);
+    const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+    const [isRequestingLocation, setIsRequestingLocation] = useState(false);
+    const [locationError, setLocationError] = useState<string | null>(null);
+    const hasInitializedRef = useRef(false);
 
     // Tools State
     const [activeTool, setActiveTool] = useState<'none' | 'boundary' | 'marker' | 'edit' | 'delete'>('none');
@@ -66,37 +69,109 @@ const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEdit
         description: ''
     });
 
+    // Reset initialized flag when we switch to editing a different event
+    useEffect(() => {
+        hasInitializedRef.current = false;
+    }, [initialConfig, initialFacilities]);
+
+    // Manual location request function
+    const requestUserLocation = () => {
+        if (!('geolocation' in navigator)) {
+            setLocationError('Geolocation is not supported by your browser');
+            return;
+        }
+
+        setIsRequestingLocation(true);
+        setLocationError(null);
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const location: [number, number] = [position.coords.latitude, position.coords.longitude];
+                setUserLocation(location);
+                setIsRequestingLocation(false);
+
+                // Pan map to user location if map exists
+                if (map) {
+                    map.setView(location, 15, { animate: true });
+                }
+            },
+            (error) => {
+                let errorMessage = 'Unable to get your location';
+
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = 'Location permission denied. Please allow location access in your browser.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = 'Location information unavailable.';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = 'Location request timed out.';
+                        break;
+                }
+
+                setLocationError(errorMessage);
+                setIsRequestingLocation(false);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    };
+
     // Initialize map with existing data
     useEffect(() => {
-        if (!map || !featureGroupRef.current) return;
+        console.log("🗺️ MapEditor: Initialization useEffect triggered");
+        console.log("Map exists?", !!map);
+        console.log("FeatureGroup exists?", !!featureGroupRef.current);
+        console.log("initialConfig:", initialConfig);
+        console.log("initialFacilities:", initialFacilities);
+
+        if (!map || !featureGroupRef.current) {
+            console.log("⚠️ MapEditor: Skipping - map or featureGroup not ready");
+            return;
+        }
+
         const fg = featureGroupRef.current;
+        console.log("🧹 Clearing existing layers...");
         fg.clearLayers();
 
         // 1. Restore Boundaries (Polygons)
         // boundaries is an array containing arrays of [lat, lng] pairs for each polygon
         if (initialConfig?.boundaries && initialConfig.boundaries.length > 0) {
+            console.log("📐 Restoring boundaries:", initialConfig.boundaries.length, "polygons");
             // Check if boundaries is a flat array of coordinates (single polygon) or array of polygons
             const firstItem = initialConfig.boundaries[0];
             if (Array.isArray(firstItem) && typeof firstItem[0] === 'number') {
                 // It's a flat array - treat as single polygon
+                console.log("➡️ Single polygon detected");
                 const poly = L.polygon(initialConfig.boundaries, { color: 'blue', fillOpacity: 0.2 });
                 // @ts-ignore
                 poly.feature = { properties: { type: 'boundary' } };
                 fg.addLayer(poly);
+                console.log("✅ Added boundary polygon");
             } else {
                 // It's an array of polygons
-                initialConfig.boundaries.forEach((latlngs: any) => {
+                console.log("➡️ Multiple polygons detected");
+                initialConfig.boundaries.forEach((latlngs: any, index: number) => {
                     const poly = L.polygon(latlngs, { color: 'blue', fillOpacity: 0.2 });
                     // @ts-ignore
                     poly.feature = { properties: { type: 'boundary' } };
                     fg.addLayer(poly);
+                    console.log(`✅ Added polygon ${index + 1}`);
                 });
             }
+        } else {
+            console.log("ℹ️ No boundaries to restore");
         }
 
         // 2. Restore Facilities (Markers)
         if (initialFacilities) {
-            initialFacilities.forEach((fac: any) => {
+            console.log("📍 Restoring facilities:", initialFacilities.length, "markers");
+            initialFacilities.forEach((fac: any, index: number) => {
+                console.log(`Facility ${index + 1}:`, fac);
                 const emojiIcon = L.divIcon({
                     className: 'custom-poi-marker',
                     html: `<div style="font-size: 24px; text-shadow: 0 0 3px white;">${fac.icon}</div>`,
@@ -109,7 +184,10 @@ const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEdit
                 if (!Array.isArray(loc) && loc.lat) loc = [loc.lat, loc.lng];
 
                 // Fallback for missing location
-                if (!loc) return;
+                if (!loc) {
+                    console.warn("⚠️ Facility missing location:", fac);
+                    return;
+                }
 
                 const marker = L.marker(loc, { icon: emojiIcon });
                 // @ts-ignore
@@ -124,8 +202,13 @@ const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEdit
                     }
                 };
                 fg.addLayer(marker);
+                console.log(`✅ Added facility ${index + 1}: ${fac.name}`);
             });
+        } else {
+            console.log("ℹ️ No facilities to restore");
         }
+
+        console.log("🎉 MapEditor initialization complete!");
     }, [map, initialConfig, initialFacilities]); // Run when map is ready and when initial data changes
 
     // Pan to initial center when map and config are ready
@@ -237,14 +320,14 @@ const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEdit
         }
 
         if (activeTool === 'boundary') {
-            drawHandlerRef.current = new L.Draw.Polygon(map, {
+            drawHandlerRef.current = new L.Draw.Polygon(map as any, {
                 allowIntersection: true,
                 showArea: true,
                 shapeOptions: { color: 'blue', fillOpacity: 0.2 }
             });
             drawHandlerRef.current.enable();
         } else if (activeTool === 'marker') {
-            drawHandlerRef.current = new L.Draw.Marker(map, {});
+            drawHandlerRef.current = new L.Draw.Marker(map as any, {});
             drawHandlerRef.current.enable();
         } else if (activeTool === 'edit') {
             // @ts-ignore
@@ -362,10 +445,35 @@ const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEdit
                 onClick={triggerUpdate}
             />
 
+            {/* Location Button */}
+            <div className="flex items-center gap-3">
+                <Button
+                    onClick={requestUserLocation}
+                    disabled={isRequestingLocation}
+                    variant="outline"
+                    className="gap-2"
+                >
+                    <MapPin className="w-4 h-4" />
+                    {isRequestingLocation ? 'Getting Location...' : 'Use My Location'}
+                </Button>
+
+                {locationError && (
+                    <div className="flex items-center gap-2 text-sm text-destructive">
+                        <span>{locationError}</span>
+                    </div>
+                )}
+
+                {userLocation && !locationError && !isRequestingLocation && (
+                    <div className="text-sm text-muted-foreground">
+                        ✓ Location: {userLocation[0].toFixed(4)}, {userLocation[1].toFixed(4)}
+                    </div>
+                )}
+            </div>
+
             <div className="h-[500px] w-full border rounded-lg overflow-hidden relative group">
                 <MapContainer
-                    center={[51.505, -0.09]}
-                    zoom={13}
+                    center={initialConfig?.center || [28.6139, 77.2090]}
+                    zoom={initialConfig?.zoom || 13}
                     style={{ height: '100%', width: '100%' }}
                 >
                     <TileLayer
@@ -461,7 +569,7 @@ const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEdit
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="z-[10000]">
                                         <SelectItem value="stage">Stage</SelectItem>
                                         <SelectItem value="food">Food</SelectItem>
                                         <SelectItem value="water">Water</SelectItem>

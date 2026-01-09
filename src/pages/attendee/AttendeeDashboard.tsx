@@ -26,6 +26,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { getEvents, EventData, getActiveAlerts, AlertData } from "@/lib/db";
 import { toast } from "sonner";
 import { SOSCheckInModal } from "@/components/SOSCheckInModal";
+import { LocationSharingCard } from "@/components/LocationSharingCard";
 
 const crowdLevels = {
   low: { color: "bg-secondary", text: "Low", description: "Easy movement" },
@@ -434,6 +435,15 @@ export const AttendeeDashboard = () => {
               </div>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Location Sharing Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+        >
+          <LocationSharingCard eventId={currentEvent.id} />
         </motion.div>
 
         {/* Quick actions */}
