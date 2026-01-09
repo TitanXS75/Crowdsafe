@@ -57,7 +57,7 @@ export function SOSPopup({ eventId: propEventId }: { eventId?: string }) {
                 console.log("[SOSPopup] Relevant active alert found:", relevantAlert);
 
                 // CHECK ACKNOWLEDGEMENT STATUS
-                const acked = JSON.parse(localStorage.getItem("acknowledgedAlerts") || "[]");
+                const acked = JSON.parse(localStorage.getItem("readAlerts") || "[]");
                 if (acked.includes(relevantAlert.id)) {
                     console.log("[SOSPopup] Alert already acknowledged. Skipping popup.");
                     return;
@@ -111,10 +111,10 @@ export function SOSPopup({ eventId: propEventId }: { eventId?: string }) {
 
     const handleAcknowledge = () => {
         if (alert) {
-            const acked = JSON.parse(localStorage.getItem("acknowledgedAlerts") || "[]");
+            const acked = JSON.parse(localStorage.getItem("readAlerts") || "[]");
             if (!acked.includes(alert.id)) {
                 acked.push(alert.id);
-                localStorage.setItem("acknowledgedAlerts", JSON.stringify(acked));
+                localStorage.setItem("readAlerts", JSON.stringify(acked));
             }
         }
         setIsOpen(false);
