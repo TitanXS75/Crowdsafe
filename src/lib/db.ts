@@ -56,7 +56,7 @@ export interface EventData {
     activeAttendees?: number;
 }
 // Events
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5003/api';
 
 // Helper to convert nested arrays to objects for Firestore compatibility
 // Firestore doesn't support nested arrays like [number, number][]
@@ -532,4 +532,16 @@ export const deleteUser = async (uid: string) => {
         console.error("Error deleting user:", error);
         throw error;
     }
+};
+
+// Active Attendees (Real-time subcollection)
+export const getActiveAttendees = (eventId: string, callback: (attendees: any[]) => void) => {
+    const q = query(
+        collection(db, "events", eventId, "active_attendees"),
+        orderBy("lastActive", "desc")
+    );
+    return onSnapshot(q, (snapshot) => {
+        const attendees = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        callback(attendees);
+    });
 };

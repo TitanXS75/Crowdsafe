@@ -28,7 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getEvents, getActiveEmergencyRequests, EmergencyRequest } from "@/lib/db";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { getEvents, getActiveEmergencyRequests, EmergencyRequest, getActiveAttendees } from "@/lib/db";
 
 const statsCards = [
   {
@@ -79,6 +85,8 @@ export const OrganizerDashboard = () => {
   const [selectedEventId, setSelectedEventId] = useState<string>("all");
   const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
   const [activeEmergencies, setActiveEmergencies] = useState<EmergencyRequest[]>([]);
+  const [isActiveUsersOpen, setIsActiveUsersOpen] = useState(false);
+  const [activeAttendeesList, setActiveAttendeesList] = useState<any[]>([]);
 
   // Real-time Emergency Requests
   useEffect(() => {
@@ -193,6 +201,18 @@ export const OrganizerDashboard = () => {
     return () => unsubscribe();
   }, [user, selectedEventId]);
 
+  // Fetch active attendees list
+  useEffect(() => {
+    if (selectedEventId === 'all') {
+      setActiveAttendeesList([]);
+      return;
+    }
+    const unsubscribe = getActiveAttendees(selectedEventId, (attendees) => {
+      setActiveAttendeesList(attendees);
+    });
+    return () => unsubscribe();
+  }, [selectedEventId]);
+
   const getCrowdColor = (status: string) => {
     switch (status) {
       case "high": return "bg-destructive";
@@ -257,7 +277,7 @@ export const OrganizerDashboard = () => {
         >
           {statsCards.map((stat, index) => (
             <Card key={index} className="border-border/50">
-              <CardContent className="p-4">
+              <CardContent className="p-4 relative">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">{stat.title}</p>
@@ -268,6 +288,15 @@ export const OrganizerDashboard = () => {
                       <TrendingUp className="w-3 h-3" />
                       {stat.change}
                     </div>
+                    {stat.id === "active-users" && selectedEventId !== "all" && (
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-xs mt-2 text-primary"
+                        onClick={() => setIsActiveUsersOpen(true)}
+                      >
+                        View List
+                      </Button>
+                    )}
                   </div>
                   <div className={`w-10 h-10 rounded-lg ${stat.color} flex items-center justify-center`}>
                     <stat.icon className="w-5 h-5 text-white" />
@@ -278,8 +307,51 @@ export const OrganizerDashboard = () => {
           ))}
         </motion.div>
 
+        {/* Active Attendees Modal */}
+        <Dialog open={isActiveUsersOpen} onOpenChange={setIsActiveUsersOpen}>
+          <DialogContent className="sm:max-w-xl h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                Active Attendees ({activeAttendeesList.length})
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+              {activeAttendeesList.length > 0 ? (
+                activeAttendeesList.map((attendee) => (
+                  <div key={attendee.id} className="flex items-center justify-between p-3 rounded-lg border bg-card/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                        {attendee.name?.[0]?.toUpperCase() || "U"}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{attendee.name || "Anonymous User"}</p>
+                        <p className="text-xs text-muted-foreground">{attendee.email || "No email"}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                        Active
+                      </span>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Last active: {attendee.lastActive?.seconds ? new Date(attendee.lastActive.seconds * 1000).toLocaleTimeString() : 'Now'}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <Users className="w-10 h-10 mb-2 opacity-50" />
+                  <p>No active attendees found for this event.</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Live Tracking Quick Access */}
         <motion.div
+          // ... (keep existing Live Tracking block)
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
@@ -308,9 +380,10 @@ export const OrganizerDashboard = () => {
           </Card>
         </motion.div>
 
-        <div className="grid lg:grid-cols-3 gap-6">{/*
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Zone density */}
           <motion.div
+            // ...
             className="lg:col-span-2"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -401,68 +474,70 @@ export const OrganizerDashboard = () => {
           </motion.div>
         </div>
 
-        {/* Emergency requests */}
+        {/* Emergency requests - AGGRESSIVE BLINKING */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <Card className={`border-destructive/30 bg-destructive/5 ${activeEmergencies.length > 0 ? "animate-pulse-subtle border-destructive ring-1 ring-destructive" : ""}`}>
+          <Card
+            className={`cursor-pointer transition-all hover:scale-[1.01] duration-500 border-2 ${activeEmergencies.length > 0
+              ? "bg-red-500 text-white animate-pulse border-red-600 shadow-[0_0_20px_rgba(239,68,68,0.6)]"
+              : "border-destructive/30 bg-destructive/5 hover:border-destructive/60"
+              }`}
+            onClick={() => {
+              // Always go to page even if 0 requests, so they can see history or checked
+              window.location.href = "/organizer/emergencies";
+            }}
+          >
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <AlertTriangle className={`w-5 h-5 text-destructive ${activeEmergencies.length > 0 ? "animate-pulse" : ""}`} />
-                  Active Emergency Requests ({activeEmergencies.length})
+                <CardTitle className="text-xl flex items-center gap-3">
+                  <div className={`p-2 rounded-full ${activeEmergencies.length > 0 ? "bg-white text-red-600" : "bg-destructive/10 text-destructive"}`}>
+                    <AlertTriangle className={`w-6 h-6 ${activeEmergencies.length > 0 ? "animate-bounce" : ""}`} />
+                  </div>
+                  <span className={activeEmergencies.length > 0 ? "font-black tracking-wide" : ""}>
+                    {activeEmergencies.length > 0 ? "CRITICAL: EMERGENCY REQUESTS ACTIVE" : "Emergency Requests"}
+                  </span>
+                  {activeEmergencies.length > 0 && (
+                    <span className="bg-white text-red-600 px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+                      {activeEmergencies.length} New
+                    </span>
+                  )}
                 </CardTitle>
-                <Button variant="destructive" size="sm" asChild>
-                  <NavLink to="/organizer/emergencies">Manage All</NavLink>
+                <Button
+                  variant={activeEmergencies.length > 0 ? "secondary" : "destructive"}
+                  size="sm"
+                  asChild
+                  onClick={(e) => e.stopPropagation()}
+                  className={activeEmergencies.length > 0 ? "font-bold shadow-lg" : ""}
+                >
+                  <NavLink to="/organizer/emergencies">
+                    {activeEmergencies.length > 0 ? "RESOLVE NOW" : "Manage"}
+                  </NavLink>
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-3 md:grid-cols-3">
-                {activeEmergencies.length > 0 ? activeEmergencies.map((req) => (
-                  <Card key={req.id} className="border-border/50 bg-card border-red-500/20 shadow-red-500/10 shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-foreground text-red-600">{req.type}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium animate-pulse bg-red-100 text-red-700`}>
-                          {req.status.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="space-y-1 text-sm text-muted-foreground">
-                        {req.description && (
-                          <p className="italic text-xs mb-2">"{req.description}"</p>
-                        )}
-                        <p className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {req.location ? (
-                            <a
-                              href={`https://www.google.com/maps?q=${req.location.lat},${req.location.lng}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline hover:text-primary"
-                            >
-                              {req.location.label || `Lat: ${req.location.lat.toFixed(4)}, Lng: ${req.location.lng.toFixed(4)}`}
-                            </a>
-                          ) : "Unknown Location"}
-                        </p>
-                        <p className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {req.timestamp?.seconds ? new Date(req.timestamp.seconds * 1000).toLocaleTimeString() : "Just now"}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )) : (
-                  <div className="col-span-3 text-center py-8 text-muted-foreground text-sm">
-                    No active emergency requests for this event.
-                  </div>
-                )}
-              </div>
+              {/* Content remains similar but styled for high visibility if needed */}
+              {activeEmergencies.length > 0 ? (
+                <div className="bg-white/10 rounded-lg p-4 mt-2 backdrop-blur-sm border border-white/20">
+                  <p className="font-medium text-lg mb-2">
+                    ⚠️ Action Required Immediately
+                  </p>
+                  <p className="opacity-90 text-sm">
+                    {activeEmergencies.length} active status requests need staff attention. Click here to view details and respond.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  System Normal. No active emergencies reported.
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
+
       </div>
     </OrganizerLayout>
   );

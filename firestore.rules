@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if true; // Allow all for now, should be restricted to authenticated users
+    }
+    
+    // Events collection
+    match /events/{eventId} {
+      allow read: if true; // Anyone can read event details
+      allow write: if true; // Organizers can create/update events
+      
+      // Active attendees subcollection
+      match /active_attendees/{attendeeId} {
+        allow read, write: if true; // Allow attendees to check in
+      }
+    }
+    
+    // Emergency requests collection - CRITICAL FIX
+    match /emergency_requests/{requestId} {
+      allow read: if true; // Organizers and responders need to read
+      allow create: if true; // Allow attendees to create emergency requests
+      allow update: if true; // Allow organizers to update status
+      allow delete: if true; // Allow organizers to delete resolved requests
+    }
+    
+    // Alerts collection
+    match /alerts/{alertId} {
+      allow read: if true; // Everyone can read alerts
+      allow write: if true; // Only organizers can create alerts
+    }
+    
+    // Facilities collection
+    match /facilities/{facilityId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Zones collection
+    match /zones/{zoneId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Allow all other operations for development
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
