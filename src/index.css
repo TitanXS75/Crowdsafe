@@ -1,0 +1,221 @@
+@import "@fontsource/plus-jakarta-sans/400.css";
+@import "@fontsource/plus-jakarta-sans/500.css";
+@import "@fontsource/plus-jakarta-sans/600.css";
+@import "@fontsource/plus-jakarta-sans/700.css";
+@import "@fontsource/plus-jakarta-sans/800.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Core brand colors - Safety-focused blues and greens */
+    --background: 210 40% 98%;
+    --foreground: 220 30% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 12%;
+
+    /* Primary - Deep trustworthy blue */
+    --primary: 217 91% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 217 91% 60%;
+
+    /* Secondary - Safety green */
+    --secondary: 160 60% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Accent - Vibrant teal */
+    --accent: 180 70% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 220 20% 96%;
+    --muted-foreground: 220 15% 50%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 90%;
+    --input: 220 20% 90%;
+    --ring: 217 91% 45%;
+
+    --radius: 0.75rem;
+
+    /* Custom gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 45%), hsl(180 70% 42%));
+    --gradient-hero: linear-gradient(180deg, hsl(210 40% 98%) 0%, hsl(210 50% 95%) 100%);
+    --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 40% 99%) 100%);
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(220 30% 12% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(220 30% 12% / 0.08), 0 2px 4px -2px hsl(220 30% 12% / 0.05);
+    --shadow-lg: 0 10px 15px -3px hsl(220 30% 12% / 0.1), 0 4px 6px -4px hsl(220 30% 12% / 0.05);
+    --shadow-xl: 0 20px 25px -5px hsl(220 30% 12% / 0.1), 0 8px 10px -6px hsl(220 30% 12% / 0.05);
+    --shadow-glow: 0 0 40px hsl(217 91% 45% / 0.2);
+    --shadow-glow-green: 0 0 40px hsl(160 60% 45% / 0.2);
+
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.6);
+    --glass-blur: blur(20px);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 30% 8%;
+    --foreground: 210 40% 98%;
+
+    --card: 220 30% 12%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 220 30% 12%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 217 91% 65%;
+
+    --secondary: 160 60% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    --accent: 180 70% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 15% 65%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --ring: 217 91% 55%;
+
+    --gradient-hero: linear-gradient(180deg, hsl(220 30% 8%) 0%, hsl(220 25% 12%) 100%);
+    --gradient-glass: linear-gradient(135deg, rgba(30,35,50,0.9) 0%, rgba(30,35,50,0.7) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(220 30% 12%) 0%, hsl(220 25% 15%) 100%);
+
+    --glass-bg: rgba(30, 35, 50, 0.85);
+    --glass-border: rgba(60, 65, 80, 0.6);
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+  }
+
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-glow-green {
+    box-shadow: var(--shadow-glow-green);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 6s ease-in-out 2s infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 4s ease-in-out infinite;
+  }
+
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(to right, hsl(var(--primary) / 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .bg-map-lines {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg stroke='%231e88e5' stroke-width='0.5' stroke-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Fix for Leaflet Popups appearing behind map or other elements */
+.leaflet-pane {
+  z-index: 400;
+}
+.leaflet-top, .leaflet-bottom {
+  z-index: 1000;
+}
+.leaflet-popup-pane {
+  z-index: 700;
+}
+.leaflet-popup {
+  z-index: 1001 !important;
+}
