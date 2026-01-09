@@ -193,6 +193,48 @@ router.post('/navigation/routes', (req, res) => {
     }
 });
 
+// Analyze Client-Side Routes (Hybrid Approach)
+router.post('/navigation/analyze', (req, res) => {
+    try {
+        const { routes, eventId } = req.body;
+        // routes: [{ id, geometry: [[lat, lng], ...] }]
+
+        if (!routes || !Array.isArray(routes)) {
+            return res.status(400).json({ error: 'Routes array required' });
+        }
+
+        const event = eventId ? eventService.getEventById(eventId) : null;
+        const restrictedZones = event?.mapConfig?.restrictedZones || [];
+
+        const analyzedRoutes = routes.map(route => {
+            // Adapt the route object structure if needed for safetyService
+            // safetyService expects { geometry: [...] }
+
+            // Calculate crowd density score
+            const crowdDensity = crowdService.getRouteDensity(route.geometry);
+
+            // Calculate Safety (Crowd + Restrictions)
+            // We can reuse safetyService.calculateRouteSafety or manual
+            // Let's reuse safetyService
+            const safety = require('../services/safetyService').calculateRouteSafety(route, restrictedZones);
+
+            return {
+                ...route,
+                safety: safety
+            };
+        });
+
+        res.json({
+            status: 'success',
+            data: analyzedRoutes
+        });
+
+    } catch (error) {
+        console.error("Analysis Error:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
 // Email Service Setup
 const nodemailer = require('nodemailer');
 

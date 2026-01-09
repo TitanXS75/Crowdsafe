@@ -195,7 +195,7 @@ const InteractiveMap = ({ config, facilities, routes, selectedRouteId, onRouteSe
                             <Popup>
                                 <div className="text-sm">
                                     <div className="font-bold mb-1">Route Option</div>
-                                    <div>Safety: <span style={{ color: route.safety.color, fontWeight: 'bold' }}>{route.safety.label}</span></div>
+                                    <div>Crowd: <span style={{ color: route.safety.color, fontWeight: 'bold' }}>{route.safety.label}</span></div>
                                     <div>ETA: {route.duration} mins</div>
                                     <div>Distance: {route.distance}m</div>
                                 </div>

@@ -131,6 +131,15 @@ const MapEditorContent = ({ onConfigChange, initialConfig, initialFacilities }: 
     useEffect(() => {
         if (!drawingManagerRef.current) return;
 
+        // Toggle polygon interactivity based on tool
+        boundaries.forEach(poly => {
+            if (activeTool === 'marker') {
+                poly.setOptions({ clickable: false, editable: false });
+            } else {
+                poly.setOptions({ clickable: true, editable: true });
+            }
+        });
+
         switch (activeTool) {
             case 'boundary':
                 drawingManagerRef.current.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
@@ -154,7 +163,7 @@ const MapEditorContent = ({ onConfigChange, initialConfig, initialFacilities }: 
             default:
                 drawingManagerRef.current.setDrawingMode(null);
         }
-    }, [activeTool, map]);
+    }, [activeTool, map, boundaries]);
 
     const updateConfig = useCallback(() => {
         if (!map) return;
