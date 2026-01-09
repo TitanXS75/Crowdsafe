@@ -1,306 +1,210 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import LiveCrowdMap from '@/components/LiveCrowdMap';
-import { subscribeToEventLocations, AttendeeLocation } from '@/services/locationService';
-import { Card } from '@/components/ui/card';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Users, MapPin, Activity, AlertTriangle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, UserCheck, AlertTriangle, AlertCircle, MapPin } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { OrganizerLayout } from '@/components/organizer/OrganizerLayout';
+import { NavLink } from 'react-router-dom';
+import LiveCrowdMap from '@/components/LiveCrowdMap';
 
 const LiveTracking = () => {
-    const { user } = useAuth();
-    const [allEvents, setAllEvents] = useState<any[]>([]);
-    const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-    const [eventData, setEventData] = useState<any>(null);
-    const [locations, setLocations] = useState<Record<string, AttendeeLocation>>({});
     const [showHeatmap, setShowHeatmap] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<'all' | 'safe' | 'attention' | 'emergency'>('all');
-    const [isLoading, setIsLoading] = useState(true);
+    const [showStats, setShowStats] = useState(true);
 
-    // Load all events for this organizer
-    useEffect(() => {
-        const loadEvents = async () => {
-            if (!user) return;
-
-            try {
-                const eventsQuery = query(
-                    collection(db, 'events'),
-                    where('organizerId', '==', user.uid)
-                );
-
-                const eventsSnapshot = await getDocs(eventsQuery);
-
-                if (!eventsSnapshot.empty) {
-                    const events = eventsSnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-
-                    // Sort by createdAt descending (most recent first)
-                    events.sort((a: any, b: any) => {
-                        const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
-                        const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
-                        return bTime - aTime;
-                    });
-
-                    setAllEvents(events);
-                    // Auto-select the most recent event
-                    setSelectedEventId(events[0].id);
-                    setIsLoading(false); // Fix: Set loading to false after events load
-                } else {
-                    setIsLoading(false);
-                }
-            } catch (error) {
-                console.error('Error loading events:', error);
-                setIsLoading(false);
-            }
-        };
-
-        loadEvents();
-    }, [user]);
-
-    // Load selected event data and subscribe to locations
-    useEffect(() => {
-        if (!selectedEventId) return;
-
-        const selectedEvent = allEvents.find(e => e.id === selectedEventId);
-        if (!selectedEvent) return;
-
-        setEventData(selectedEvent);
-
-        // Subscribe to live locations
-        const unsubscribe = subscribeToEventLocations(selectedEventId, (updatedLocations) => {
-            setLocations(updatedLocations);
-        });
-
-        return () => unsubscribe();
-    }, [selectedEventId, allEvents]);
-
-    const attendeeCount = Object.keys(locations).length;
-    const safeCount = Object.values(locations).filter(l => l.status === 'safe').length;
-    const attentionCount = Object.values(locations).filter(l => l.status === 'attention').length;
-    const emergencyCount = Object.values(locations).filter(l => l.status === 'emergency').length;
-
-    const filteredAttendees = Object.values(locations).filter(loc =>
-        filterStatus === 'all' ? true : loc.status === filterStatus
-    );
-
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-lg text-gray-600">Loading live tracking...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!eventData && allEvents.length === 0 && !isLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <Card className="p-8 text-center max-w-md">
-                    <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold mb-2">No Events Found</h2>
-                    <p className="text-gray-600 mb-4">
-                        You need to create an event first to use live tracking.
-                    </p>
-                    <Button onClick={() => window.location.href = '/organizer/event-setup'}>
-                        Create Event
-                    </Button>
-                </Card>
-            </div>
-        );
-    }
+    // Mock event ID - in real app this would come from context or route params
+    const eventId = "demo-event-123";
 
     return (
-        <div className="h-screen flex flex-col bg-gray-50">
-            {/* Header */}
-            <div className="bg-white shadow-sm border-b px-6 py-4">
-                <div className="flex items-center justify-between">
+        <OrganizerLayout>
+            <div className="space-y-6">
+                {/* Header */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center justify-between"
+                >
                     <div className="flex items-center gap-4">
+                        <Button variant="ghost" size="sm" asChild>
+                            <NavLink to="/organizer">
+                                <ArrowLeft className="w-4 h-4 mr-2" />
+                                Back to Dashboard
+                            </NavLink>
+                        </Button>
                         <div>
-                            <h1 className="text-2xl font-bold flex items-center gap-2">
-                                <MapPin className="w-6 h-6 text-primary" />
+                            <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
                                 Live Crowd Tracking
                             </h1>
-                            <p className="text-sm text-gray-600 mt-1">{eventData?.name || 'Select an event'}</p>
+                            <p className="text-muted-foreground mt-1">
+                                Real-time attendee locations and crowd density
+                            </p>
                         </div>
+                    </div>
+                </motion.div>
 
-                        {/* Event Selector - Always show if events exist */}
-                        {allEvents.length > 0 && (
-                            <div className="ml-4">
-                                <Select value={selectedEventId || ''} onValueChange={setSelectedEventId}>
-                                    <SelectTrigger className="w-64">
-                                        <SelectValue placeholder="Select event" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {allEvents.map((event) => (
-                                            <SelectItem key={event.id} value={event.id}>
-                                                {event.name} - {new Date(event.createdAt?.toDate?.() || event.createdAt).toLocaleDateString()}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                {/* Controls */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                >
+                    <Card className="border-border/50">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-base">Map Controls</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-wrap gap-6">
+                                <div className="flex items-center space-x-2">
+                                    <Switch
+                                        id="heatmap"
+                                        checked={showHeatmap}
+                                        onCheckedChange={setShowHeatmap}
+                                    />
+                                    <Label htmlFor="heatmap" className="text-sm">
+                                        Show Heatmap
+                                    </Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <Switch
+                                        id="stats"
+                                        checked={showStats}
+                                        onCheckedChange={setShowStats}
+                                    />
+                                    <Label htmlFor="stats" className="text-sm">
+                                        Show Statistics
+                                    </Label>
+                                </div>
                             </div>
-                        )}
+                        </CardContent>
+                    </Card>
+                </motion.div>
+
+                {/* Map Container */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="grid lg:grid-cols-4 gap-6"
+                >
+                    {/* Main Map */}
+                    <div className="lg:col-span-3">
+                        <Card className="border-border/50 h-[600px]">
+                            <CardContent className="p-0 h-full">
+                                <LiveCrowdMap
+                                    eventId={eventId}
+                                    config={{
+                                        center: [28.6139, 77.2090], // Default to Delhi
+                                        zoom: 16,
+                                        boundaries: [
+                                            [
+                                                [28.614, 77.208],
+                                                [28.614, 77.210],
+                                                [28.613, 77.210],
+                                                [28.613, 77.208]
+                                            ]
+                                        ]
+                                    }}
+                                    showHeatmap={showHeatmap}
+                                />
+                            </CardContent>
+                        </Card>
                     </div>
 
-                    {/* Quick Stats */}
-                    <div className="flex gap-4">
-                        <Card className="px-4 py-2">
-                            <div className="flex items-center gap-2">
-                                <Users className="w-5 h-5 text-primary" />
-                                <div>
-                                    <div className="text-2xl font-bold">{attendeeCount}</div>
-                                    <div className="text-xs text-gray-600">Active</div>
-                                </div>
-                            </div>
-                        </Card>
-                        <Card className="px-4 py-2">
-                            <div className="flex items-center gap-2">
-                                <UserCheck className="w-5 h-5 text-green-500" />
-                                <div>
-                                    <div className="text-2xl font-bold text-green-600">{safeCount}</div>
-                                    <div className="text-xs text-gray-600">Safe</div>
-                                </div>
-                            </div>
-                        </Card>
-                        {emergencyCount > 0 && (
-                            <Card className="px-4 py-2 border-red-500">
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="w-5 h-5 text-red-500" />
-                                    <div>
-                                        <div className="text-2xl font-bold text-red-600">{emergencyCount}</div>
-                                        <div className="text-xs text-gray-600">Emergency</div>
+                    {/* Stats Panel */}
+                    {showStats && (
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className="space-y-4"
+                        >
+                            {/* Quick Stats */}
+                            <Card className="border-border/50">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Activity className="w-4 h-4" />
+                                        Live Statistics
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Total Attendees</span>
+                                        <span className="font-semibold">0</span>
                                     </div>
-                                </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Safe</span>
+                                        <span className="font-semibold text-green-600">0</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Need Attention</span>
+                                        <span className="font-semibold text-amber-600">0</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Emergency</span>
+                                        <span className="font-semibold text-red-600">0</span>
+                                    </div>
+                                </CardContent>
                             </Card>
-                        )}
-                    </div>
-                </div>
-            </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Map Section */}
-                <div className="flex-1 relative">
-                    {eventData && eventData.mapConfig ? (
-                        <LiveCrowdMap
-                            eventId={eventData.id}
-                            config={eventData.mapConfig}
-                            showHeatmap={showHeatmap}
-                        />
-                    ) : (
-                        <div className="flex items-center justify-center h-full">
-                            <p className="text-gray-500">No map configured for this event</p>
-                        </div>
-                    )}
-
-                    {/* Map Controls */}
-                    <div className="absolute bottom-4 left-4 z-[1000]">
-                        <Card className="p-2">
-                            <Button
-                                size="sm"
-                                variant={showHeatmap ? 'default' : 'outline'}
-                                onClick={() => setShowHeatmap(!showHeatmap)}
-                            >
-                                {showHeatmap ? '🔥 Hide Heatmap' : '🔥 Show Heatmap'}
-                            </Button>
-                        </Card>
-                    </div>
-                </div>
-
-                {/* Attendee List Sidebar */}
-                <div className="w-80 bg-white border-l flex flex-col">
-                    <div className="p-4 border-b">
-                        <h3 className="font-bold mb-3">Attendees ({filteredAttendees.length})</h3>
-
-                        {/* Filter Buttons */}
-                        <div className="flex gap-2 flex-wrap">
-                            <Button
-                                size="sm"
-                                variant={filterStatus === 'all' ? 'default' : 'outline'}
-                                onClick={() => setFilterStatus('all')}
-                            >
-                                All
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant={filterStatus === 'safe' ? 'default' : 'outline'}
-                                onClick={() => setFilterStatus('safe')}
-                                className="bg-green-500 hover:bg-green-600"
-                            >
-                                Safe ({safeCount})
-                            </Button>
-                            {attentionCount > 0 && (
-                                <Button
-                                    size="sm"
-                                    variant={filterStatus === 'attention' ? 'default' : 'outline'}
-                                    onClick={() => setFilterStatus('attention')}
-                                    className="bg-amber-500 hover:bg-amber-600"
-                                >
-                                    Attention ({attentionCount})
-                                </Button>
-                            )}
-                            {emergencyCount > 0 && (
-                                <Button
-                                    size="sm"
-                                    variant={filterStatus === 'emergency' ? 'default' : 'outline'}
-                                    onClick={() => setFilterStatus('emergency')}
-                                    className="bg-red-500 hover:bg-red-600"
-                                >
-                                    Emergency ({emergencyCount})
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Attendee List */}
-                    <ScrollArea className="flex-1">
-                        <div className="p-4 space-y-2">
-                            {filteredAttendees.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">No attendees found</p>
-                                </div>
-                            ) : (
-                                filteredAttendees.map((attendee) => (
-                                    <Card key={attendee.userId} className="p-3 hover:shadow-md transition-shadow">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <div className="font-semibold text-sm">{attendee.name}</div>
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    {new Date(attendee.lastSeen).toLocaleTimeString()}
-                                                </div>
-                                                <div className="text-xs text-gray-400 mt-1">
-                                                    {attendee.lat.toFixed(6)}, {attendee.lng.toFixed(6)}
-                                                </div>
-                                            </div>
-                                            <Badge
-                                                className={
-                                                    attendee.status === 'emergency'
-                                                        ? 'bg-red-500'
-                                                        : attendee.status === 'attention'
-                                                            ? 'bg-amber-500'
-                                                            : 'bg-green-500'
-                                                }
-                                            >
-                                                {attendee.status}
-                                            </Badge>
+                            {/* Zone Density */}
+                            <Card className="border-border/50">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <MapPin className="w-4 h-4" />
+                                        Zone Density
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span>Main Stage</span>
+                                            <span className="text-muted-foreground">0%</span>
                                         </div>
-                                    </Card>
-                                ))
-                            )}
-                        </div>
-                    </ScrollArea>
-                </div>
+                                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                            <div className="h-full w-0 bg-green-500 rounded-full transition-all" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span>Food Court</span>
+                                            <span className="text-muted-foreground">0%</span>
+                                        </div>
+                                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                            <div className="h-full w-0 bg-green-500 rounded-full transition-all" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span>Exit Points</span>
+                                            <span className="text-muted-foreground">0%</span>
+                                        </div>
+                                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                            <div className="h-full w-0 bg-green-500 rounded-full transition-all" />
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Alerts */}
+                            <Card className="border-border/50">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <AlertTriangle className="w-4 h-4" />
+                                        Active Alerts
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-center py-4 text-muted-foreground text-sm">
+                                        No active alerts
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    )}
+                </motion.div>
             </div>
-        </div>
+        </OrganizerLayout>
     );
 };
 
