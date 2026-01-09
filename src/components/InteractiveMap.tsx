@@ -65,6 +65,31 @@ const InteractiveMap = ({ config, facilities, routes, selectedRouteId, onRouteSe
 
     if (!config) return <div className="p-4 text-center">No map configuration available</div>;
 
+    // Helper to render boundaries safely
+    const renderBoundaries = () => {
+        if (!config.boundaries || config.boundaries.length === 0) return null;
+
+        const firstItem = config.boundaries[0];
+        // Check if flat array (single polygon) [lat, lng]
+        if (Array.isArray(firstItem) && typeof firstItem[0] === 'number') {
+            return (
+                <Polygon
+                    positions={config.boundaries as any}
+                    pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
+                />
+            );
+        } else {
+            // Array of polygons
+            return config.boundaries.map((polygon: any, idx: number) => (
+                <Polygon
+                    key={`boundary-${idx}`}
+                    positions={polygon}
+                    pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
+                />
+            ));
+        }
+    };
+
     return (
         <div className="h-full w-full">
             <MapContainer
@@ -80,50 +105,27 @@ const InteractiveMap = ({ config, facilities, routes, selectedRouteId, onRouteSe
                 <MapUpdater center={center} zoom={zoom} />
                 {onMapClick && <MapEventController onMapClick={onMapClick} />}
 
-                {/* Draw Boundaries */}
-                {config.boundaries && config.boundaries.length > 0 && (() => {
-                    // Check if boundaries is a flat array of coordinates (single polygon) or array of polygons
-                    const firstItem = config.boundaries[0];
-                    if (Array.isArray(firstItem) && typeof firstItem[0] === 'number') {
-                        // It's a flat array - treat as single polygon
-                        return (
-                            <Polygon
-                                positions={config.boundaries}
-                                pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
-                            />
-                        );
-                    } else {
-                        // It's an array of polygons - render each one
-                        return config.boundaries.map((polygon: any, idx: number) => (
-                            <Polygon
-                                key={`boundary-${idx}`}
-                                positions={polygon}
-                                pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
-                            />
-                        ));
-                    }
-                })()}
+                {/* Boundaries */}
+                {renderBoundaries()}
 
-                {/* Draw Restricted Zones */}
+                {/* Restricted Zones */}
                 {config.restrictedZones && config.restrictedZones.map((pos, idx) => (
                     <Marker key={`zone-${idx}`} position={pos}>
                         <Popup>Restricted Zone</Popup>
                     </Marker>
                 ))}
 
-                {/* Draw Facilities / POIs */}
+                {/* Facilities / POIs */}
                 {facilities && facilities.map((poi) => {
-                    // Create custom icon for the POI
+                    const iconHtml = `<div style="font-size: 24px; text-shadow: 0 0 3px white;">${poi.icon || '📍'}</div>`;
                     const emojiIcon = L.divIcon({
                         className: 'custom-poi-marker',
-                        html: `<div style="font-size: 24px; text-shadow: 0 0 3px white;">${poi.icon || '📍'}</div>`,
+                        html: iconHtml,
                         iconSize: [30, 30],
                         iconAnchor: [15, 15]
                     });
 
-                    // Ensure safe location (legacy data might be missing it)
                     if (!poi.location) return null;
-                    // Handle object location if necessary (though interface says array now)
                     const loc: [number, number] = Array.isArray(poi.location)
                         ? poi.location
                         : [(poi.location as any).lat, (poi.location as any).lng];
@@ -171,7 +173,7 @@ const InteractiveMap = ({ config, facilities, routes, selectedRouteId, onRouteSe
                     </Marker>
                 )}
 
-                {/* Draw Routes */}
+                {/* Routes */}
                 {routes && routes.map((route) => {
                     const isSelected = route.id === selectedRouteId;
                     const opacity = selectedRouteId ? (isSelected ? 1 : 0.2) : 0.8;

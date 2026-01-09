@@ -357,13 +357,71 @@ export const EventSetup = () => {
               </CardContent>
             </Card>
 
+            {/* Map Embed URL - Option for External Maps */}
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ExternalLink className="w-5 h-5 text-primary" />
+                  External Map Embed (Optional)
+                </CardTitle>
+                <CardDescription>
+                  Use Google My Maps or paste an iframe embed URL instead of the interactive editor
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mapEmbedUrl">Map Embed URL or iFrame Code</Label>
+                    <Textarea
+                      id="mapEmbedUrl"
+                      rows={3}
+                      placeholder='Paste iframe code like: <iframe src="https://www.google.com/maps/d/embed?mid=..." width="640" height="480"></iframe>'
+                      value={eventData.mapEmbedUrl || ""}
+                      onChange={(e) => setEventData(prev => ({ ...prev, mapEmbedUrl: e.target.value }))}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>How to get Google My Maps embed code</AlertTitle>
+                    <AlertDescription className="space-y-1">
+                      <p>1. Create your map at <a href="https://www.google.com/maps/d/" target="_blank" rel="noopener" className="text-primary underline">Google My Maps</a></p>
+                      <p>2. Click "Share" → Make it public or unlisted</p>
+                      <p>3. Click the ⋮ menu → "Embed on my site"</p>
+                      <p>4. Copy the entire iframe code and paste above</p>
+                    </AlertDescription>
+                  </Alert>
+                  {eventData.mapEmbedUrl && (
+                    <div className="p-3 bg-secondary/20 rounded-md border">
+                      <p className="text-xs text-muted-foreground mb-2">Preview:</p>
+                      <div className="aspect-video bg-muted rounded overflow-hidden">
+                        <iframe
+                          src={eventData.mapEmbedUrl.includes('<iframe')
+                            ? eventData.mapEmbedUrl.match(/src="([^"]+)"/)?.[1] || ''
+                            : eventData.mapEmbedUrl}
+                          width="100%"
+                          height="100%"
+                          style={{ border: 0 }}
+                          allowFullScreen
+                          loading="lazy"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Map */}
             <Card className="border-border/50">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-primary" />
-                  Event Map
+                  Interactive Map Editor (Optional)
                 </CardTitle>
+                <CardDescription>
+                  Or design your own map with boundaries, zones, and facilities
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -372,6 +430,7 @@ export const EventSetup = () => {
                     <AlertTitle>Interactive Map Configuration</AlertTitle>
                     <AlertDescription>
                       Draw the event boundaries and mark restricted zones using the tools below.
+                      Note: If you provided an embed URL above, that will be used instead.
                     </AlertDescription>
                   </Alert>
 

@@ -12,9 +12,61 @@ import LiveCrowdMap from '@/components/LiveCrowdMap';
 const LiveTracking = () => {
     const [showHeatmap, setShowHeatmap] = useState(true);
     const [showStats, setShowStats] = useState(true);
+    const [event, setEvent] = useState<any>(null);
 
-    // Mock event ID - in real app this would come from context or route params
-    const eventId = "demo-event-123";
+    // Load current event from localStorage
+    useState(() => {
+        const storedEvent = localStorage.getItem("currentEvent");
+        if (storedEvent) {
+            try {
+                setEvent(JSON.parse(storedEvent));
+            } catch (error) {
+                console.error("Error parsing event:", error);
+            }
+        }
+    });
+
+    // If no event is selected, show a message
+    if (!event) {
+        return (
+            <OrganizerLayout>
+                <div className="flex items-center justify-center h-[60vh]">
+                    <Card className="max-w-md">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <MapPin className="w-5 h-5" />
+                                No Event Selected
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p className="text-muted-foreground">
+                                Please select an event first to view live tracking.
+                            </p>
+                            <Button asChild>
+                                <NavLink to="/organizer/events">
+                                    Select Event
+                                </NavLink>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            </OrganizerLayout>
+        );
+    }
+
+    const eventId = event.id || "demo-event-123";
+    const mapConfig = event.mapConfig || {
+        center: [28.6139, 77.2090], // Default to Delhi
+        zoom: 16,
+        boundaries: [
+            [
+                [28.614, 77.208],
+                [28.614, 77.210],
+                [28.613, 77.210],
+                [28.613, 77.208]
+            ]
+        ]
+    };
 
     return (
         <OrganizerLayout>
@@ -37,7 +89,7 @@ const LiveTracking = () => {
                                 Live Crowd Tracking
                             </h1>
                             <p className="text-muted-foreground mt-1">
-                                Real-time attendee locations and crowd density
+                                {event.name} - Real-time attendee locations
                             </p>
                         </div>
                     </div>
@@ -93,18 +145,7 @@ const LiveTracking = () => {
                             <CardContent className="p-0 h-full">
                                 <LiveCrowdMap
                                     eventId={eventId}
-                                    config={{
-                                        center: [28.6139, 77.2090], // Default to Delhi
-                                        zoom: 16,
-                                        boundaries: [
-                                            [
-                                                [28.614, 77.208],
-                                                [28.614, 77.210],
-                                                [28.613, 77.210],
-                                                [28.613, 77.208]
-                                            ]
-                                        ]
-                                    }}
+                                    config={mapConfig}
                                     showHeatmap={showHeatmap}
                                 />
                             </CardContent>
