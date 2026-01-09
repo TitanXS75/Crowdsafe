@@ -66,48 +66,30 @@ export function SOSPanel() {
 
         setIsSending(true);
         try {
-            // 1. Create In-App Alert (Firestore)
-            await createAlert({
-                title: form.title,
-                message: form.message,
-                severity: form.severity,
-                zone: form.zone,
-                eventId: eventId,
-                active: true,
+
+            // Updated Flow: Delegate all SOS logic (Alert Creation + Email) to Backend
+            const response = await fetch("http://localhost:5000/api/send-sos", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    eventId: eventId,
+                    alertDetails: form,
+                }),
             });
 
-            // 2. Fetch Attendees for Email
-            // Note: We need manually fetch subcollection. 
-            // Firestore Web SDK doesn't support collectionGroup easily for this specific nested structure 
-            // without index, but simple subcollection get is fine.
-            const attendeesRef = collection(db, "events", eventId, "active_attendees");
-            const snapshot = await getDocs(attendeesRef);
-            const emails = snapshot.docs.map(doc => doc.data().email).filter(Boolean);
-
-            if (emails.length > 0) {
-                // 3. Send Emails via Backend
-                const response = await fetch("http://localhost:5000/api/send-sos", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        eventId: eventId,
-                        alertDetails: form,
-                        recipients: emails,
-                    }),
-                });
-
-                if (!response.ok) {
-                    throw new Error("Backend failed to send emails");
-                }
-
-                const result = await response.json();
-                console.log("Email Result:", result);
-                toast.success(`SOS Deployed! In-App Alert + ${emails.length} Emails Sent.`);
-            } else {
-                toast.warning("SOS Deployed In-App Only", { description: "No active email attendees found." });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.message || "Backend failed to process SOS");
             }
+
+            const result = await response.json();
+            console.log("SOS Broadcast Result:", result);
+
+            toast.success("SOS Deployed Successfully!", {
+                description: result.message || "Emergency alert broadcasted."
+            });
 
             setIsOpen(false);
             setForm({ title: "", message: "", severity: "critical", zone: "All Zones" });

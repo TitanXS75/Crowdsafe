@@ -205,22 +205,51 @@ const transporter = nodemailer.createTransport({
 });
 
 // SOS / Emergency Alert Endpoint
+// SOS / Emergency Alert Endpoint
 router.post('/send-sos', async (req, res) => {
-    const { eventId, alertDetails, recipients } = req.body;
+    const { eventId, alertDetails } = req.body;
+    const { db } = require('../config/firebase');
+    const { collection, getDocs, addDoc } = require('firebase/firestore');
 
-    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-        return res.status(400).json({ status: 'error', message: 'No recipients provided' });
+    if (!eventId || !alertDetails) {
+        return res.status(400).json({ status: 'error', message: 'Missing eventId or alert details' });
     }
 
     console.log(`[SOS] Initiating emergency broadcast for Event ${eventId}`);
-    console.log(`[SOS] Recipients: ${recipients.length}`);
 
-    const emailPromises = recipients.map(email => {
-        const mailOptions = {
-            from: `"CrowdSafe Emergency" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: `🚨 EMERGENCY ALERT: ${alertDetails.title}`,
-            text: `
+    try {
+        // 1. Create Alert in Firestore (Server-side)
+        const alertRef = await addDoc(collection(db, "alerts"), {
+            ...alertDetails,
+            eventId,
+            active: true,
+            createdAt: new Date(),
+            time: new Date().toISOString()
+        });
+        console.log(`[SOS] Alert created in Firestore: ${alertRef.id}`);
+
+        // 2. Fetch Attendees from Firestore
+        const attendeesRef = collection(db, "events", eventId, "active_attendees");
+        const snapshot = await getDocs(attendeesRef);
+        const recipients = snapshot.docs.map(doc => doc.data().email).filter(Boolean);
+
+        console.log(`[SOS] Found ${recipients.length} recipients`);
+
+        if (recipients.length === 0) {
+            return res.json({
+                status: 'ok',
+                message: 'SOS Alert created, but no email recipients found.',
+                alertId: alertRef.id
+            });
+        }
+
+        // 3. Send Emails
+        const emailPromises = recipients.map(email => {
+            const mailOptions = {
+                from: `"CrowdSafe Emergency" <${process.env.EMAIL_USER}>`,
+                to: email,
+                subject: `🚨 EMERGENCY ALERT: ${alertDetails.title}`,
+                text: `
 URGENT SAFETY ALERT
 
 Event: ${alertDetails.zone || 'General Area'}
@@ -229,8 +258,8 @@ Severity: ${alertDetails.severity.toUpperCase()}
 ${alertDetails.message}
 
 Please follow safety instructions immediately.
-            `,
-            html: `
+                `,
+                html: `
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 2px solid #ef4444; border-radius: 8px; overflow: hidden;">
     <div style="background-color: #ef4444; color: white; padding: 20px; text-align: center;">
         <h1 style="margin: 0; text-transform: uppercase;">🚨 Emergency Alert</h1>
@@ -250,25 +279,27 @@ Please follow safety instructions immediately.
         </p>
     </div>
 </div>
-            `
-        };
+                `
+            };
 
-        return transporter.sendMail(mailOptions).catch(err => {
-            console.error(`[SOS] Failed to send to ${email}:`, err.message);
-            return { error: err.message, email };
+            return transporter.sendMail(mailOptions).catch(err => {
+                console.error(`[SOS] Failed to send to ${email}:`, err.message);
+                return { error: err.message, email };
+            });
         });
-    });
 
-    try {
         await Promise.all(emailPromises);
         console.log('[SOS] Broadcast complete');
+
         res.json({
             status: 'ok',
-            message: `Emergency alert sent to ${recipients.length} recipients`
+            message: `Emergency alert sent to ${recipients.length} recipients`,
+            alertId: alertRef.id
         });
+
     } catch (error) {
         console.error('[SOS] Broadcast critical error:', error);
-        res.status(500).json({ status: 'error', message: 'Failed to complete broadcast' });
+        res.status(500).json({ status: 'error', message: 'Failed to complete broadcast: ' + error.message });
     }
 });
 

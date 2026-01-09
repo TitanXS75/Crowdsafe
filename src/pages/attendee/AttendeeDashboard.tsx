@@ -26,6 +26,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { getEvents, EventData, getActiveAlerts, AlertData } from "@/lib/db";
 import { toast } from "sonner";
 import { SOSCheckInModal } from "@/components/SOSCheckInModal";
+import { SOSPopup } from "@/components/SOSPopup";
 
 const crowdLevels = {
   low: { color: "bg-secondary", text: "Low", description: "Easy movement" },
@@ -267,6 +268,7 @@ export const AttendeeDashboard = () => {
   return (
     <AttendeeLayout>
       <SOSCheckInModal />
+      <SOSPopup eventId={currentEvent?.id} />
       <div className="space-y-6 pb-20 lg:pb-0">
         {/* Welcome section */}
         <motion.div
