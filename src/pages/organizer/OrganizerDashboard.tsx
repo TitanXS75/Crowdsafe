@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { OrganizerLayout } from "@/components/organizer/OrganizerLayout";
 import { NavLink } from "react-router-dom";
 import { SOSPanel } from "@/components/organizer/SOSPanel";
+import { cn } from "@/lib/utils";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,8 +56,9 @@ const statsCards = [
     color: "bg-amber-500"
   },
   {
+    id: "emergency-requests",
     title: "Emergency Requests",
-    value: "0",
+    value: "0", // Will be replaced dynamically
     change: "0",
     trend: "neutral",
     icon: AlertTriangle,
@@ -276,17 +278,37 @@ export const OrganizerDashboard = () => {
           transition={{ delay: 0.1 }}
         >
           {statsCards.map((stat, index) => (
-            <Card key={index} className="border-border/50">
+            <Card
+              key={index}
+              className={cn(
+                "border-border/50",
+                stat.id === "emergency-requests" && activeEmergencies.length > 0
+                  ? "animate-pulse border-destructive ring-2 ring-destructive cursor-pointer hover:scale-[1.02] transition-all"
+                  : "",
+                stat.id === "emergency-requests" ? "cursor-pointer hover:shadow-lg transition-all" : ""
+              )}
+              onClick={() => {
+                if (stat.id === "emergency-requests") {
+                  window.location.href = "/organizer/emergencies";
+                }
+              }}
+            >
               <CardContent className="p-4 relative">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">{stat.title}</p>
                     <p className="text-2xl font-bold text-foreground mt-1">
-                      {stat.id === "active-users" ? totalActiveUsers : stat.value}
+                      {stat.id === "active-users"
+                        ? totalActiveUsers
+                        : stat.id === "emergency-requests"
+                          ? activeEmergencies.length
+                          : stat.value}
                     </p>
                     <div className={`flex items-center gap-1 mt-1 text-xs text-muted-foreground`}>
                       <TrendingUp className="w-3 h-3" />
-                      {stat.change}
+                      {stat.id === "emergency-requests"
+                        ? (activeEmergencies.length > 0 ? "Active" : "None")
+                        : stat.change}
                     </div>
                     {stat.id === "active-users" && selectedEventId !== "all" && (
                       <Button
@@ -296,6 +318,11 @@ export const OrganizerDashboard = () => {
                       >
                         View List
                       </Button>
+                    )}
+                    {stat.id === "emergency-requests" && activeEmergencies.length > 0 && (
+                      <p className="text-xs font-medium text-destructive mt-2 animate-pulse">
+                        ⚠️ Click to respond
+                      </p>
                     )}
                   </div>
                   <div className={`w-10 h-10 rounded-lg ${stat.color} flex items-center justify-center`}>
@@ -473,70 +500,6 @@ export const OrganizerDashboard = () => {
             </Card>
           </motion.div>
         </div>
-
-        {/* Emergency requests - AGGRESSIVE BLINKING */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card
-            className={`cursor-pointer transition-all hover:scale-[1.01] duration-500 border-2 ${activeEmergencies.length > 0
-              ? "bg-red-500 text-white animate-pulse border-red-600 shadow-[0_0_20px_rgba(239,68,68,0.6)]"
-              : "border-destructive/30 bg-destructive/5 hover:border-destructive/60"
-              }`}
-            onClick={() => {
-              // Always go to page even if 0 requests, so they can see history or checked
-              window.location.href = "/organizer/emergencies";
-            }}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl flex items-center gap-3">
-                  <div className={`p-2 rounded-full ${activeEmergencies.length > 0 ? "bg-white text-red-600" : "bg-destructive/10 text-destructive"}`}>
-                    <AlertTriangle className={`w-6 h-6 ${activeEmergencies.length > 0 ? "animate-bounce" : ""}`} />
-                  </div>
-                  <span className={activeEmergencies.length > 0 ? "font-black tracking-wide" : ""}>
-                    {activeEmergencies.length > 0 ? "CRITICAL: EMERGENCY REQUESTS ACTIVE" : "Emergency Requests"}
-                  </span>
-                  {activeEmergencies.length > 0 && (
-                    <span className="bg-white text-red-600 px-3 py-1 rounded-full text-sm font-bold animate-pulse">
-                      {activeEmergencies.length} New
-                    </span>
-                  )}
-                </CardTitle>
-                <Button
-                  variant={activeEmergencies.length > 0 ? "secondary" : "destructive"}
-                  size="sm"
-                  asChild
-                  onClick={(e) => e.stopPropagation()}
-                  className={activeEmergencies.length > 0 ? "font-bold shadow-lg" : ""}
-                >
-                  <NavLink to="/organizer/emergencies">
-                    {activeEmergencies.length > 0 ? "RESOLVE NOW" : "Manage"}
-                  </NavLink>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Content remains similar but styled for high visibility if needed */}
-              {activeEmergencies.length > 0 ? (
-                <div className="bg-white/10 rounded-lg p-4 mt-2 backdrop-blur-sm border border-white/20">
-                  <p className="font-medium text-lg mb-2">
-                    ⚠️ Action Required Immediately
-                  </p>
-                  <p className="opacity-90 text-sm">
-                    {activeEmergencies.length} active status requests need staff attention. Click here to view details and respond.
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground text-sm">
-                  System Normal. No active emergencies reported.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
 
       </div>
     </OrganizerLayout>
