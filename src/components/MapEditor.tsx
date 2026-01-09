@@ -73,13 +73,25 @@ const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEdit
         fg.clearLayers();
 
         // 1. Restore Boundaries (Polygons)
-        if (initialConfig?.boundaries) {
-            initialConfig.boundaries.forEach((latlngs: any) => {
-                const poly = L.polygon(latlngs, { color: 'blue' });
+        // boundaries is an array containing arrays of [lat, lng] pairs for each polygon
+        if (initialConfig?.boundaries && initialConfig.boundaries.length > 0) {
+            // Check if boundaries is a flat array of coordinates (single polygon) or array of polygons
+            const firstItem = initialConfig.boundaries[0];
+            if (Array.isArray(firstItem) && typeof firstItem[0] === 'number') {
+                // It's a flat array - treat as single polygon
+                const poly = L.polygon(initialConfig.boundaries, { color: 'blue', fillOpacity: 0.2 });
                 // @ts-ignore
                 poly.feature = { properties: { type: 'boundary' } };
                 fg.addLayer(poly);
-            });
+            } else {
+                // It's an array of polygons
+                initialConfig.boundaries.forEach((latlngs: any) => {
+                    const poly = L.polygon(latlngs, { color: 'blue', fillOpacity: 0.2 });
+                    // @ts-ignore
+                    poly.feature = { properties: { type: 'boundary' } };
+                    fg.addLayer(poly);
+                });
+            }
         }
 
         // 2. Restore Facilities (Markers)
@@ -114,7 +126,17 @@ const MapEditor = ({ onConfigChange, initialConfig, initialFacilities }: MapEdit
                 fg.addLayer(marker);
             });
         }
-    }, [map]); // Run only when map is ready (and ideally only once or when init props change deeply)
+    }, [map, initialConfig, initialFacilities]); // Run when map is ready and when initial data changes
+
+    // Pan to initial center when map and config are ready
+    useEffect(() => {
+        if (map && initialConfig?.center) {
+            const center: [number, number] = Array.isArray(initialConfig.center)
+                ? initialConfig.center
+                : [initialConfig.center.lat, initialConfig.center.lng];
+            map.setView(center, initialConfig.zoom || 13);
+        }
+    }, [map, initialConfig]);
 
     // Setup Map Handlers - STABLE (Runs once per map)
     useEffect(() => {
