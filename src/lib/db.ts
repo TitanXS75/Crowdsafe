@@ -389,6 +389,15 @@ export const getParkingZones = (callback: (zones: any[]) => void) => {
     });
 };
 
+// Get parking zones for a specific event
+export const getParkingZonesByEvent = (eventId: string, callback: (zones: any[]) => void) => {
+    const q = query(collection(db, "parking_zones"), where("eventId", "==", eventId));
+    return onSnapshot(q, (snapshot) => {
+        const zones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        callback(zones);
+    });
+};
+
 export const updateParkingZone = async (id: string, data: any) => {
     try {
         const docRef = doc(db, "parking_zones", id);
@@ -396,6 +405,115 @@ export const updateParkingZone = async (id: string, data: any) => {
     } catch (error) {
         console.error("Error updating parking zone:", error);
         throw error;
+    }
+};
+
+export const createParkingZone = async (data: {
+    name: string;
+    capacity: number;
+    eventId: string;
+    coordinates?: { lat: number; lng: number };
+    status?: string;
+}) => {
+    try {
+        const docRef = await addDoc(collection(db, "parking_zones"), {
+            ...data,
+            occupied: 0,
+            status: data.status || "open",
+            published: false,
+            createdAt: new Date()
+        });
+        console.log("Parking zone created:", docRef.id);
+        return docRef.id;
+    } catch (error) {
+        console.error("Error creating parking zone:", error);
+        throw error;
+    }
+};
+
+export const deleteParkingZone = async (id: string) => {
+    try {
+        await deleteDoc(doc(db, "parking_zones", id));
+        console.log("Parking zone deleted:", id);
+    } catch (error) {
+        console.error("Error deleting parking zone:", error);
+        throw error;
+    }
+};
+
+// ============ PARKED VEHICLES ============
+
+export interface ParkedVehicle {
+    id?: string;
+    userId: string;
+    eventId: string;
+    lat: number;
+    lng: number;
+    zoneId?: string;
+    address: string;
+    parkedAt: Date;
+}
+
+export const saveVehicleLocation = async (
+    userId: string,
+    eventId: string,
+    lat: number,
+    lng: number,
+    address: string,
+    zoneId?: string
+) => {
+    try {
+        // Save to user's document (one vehicle per user per event)
+        const docRef = doc(db, "parked_vehicles", `${eventId}_${userId}`);
+        await setDoc(docRef, {
+            userId,
+            eventId,
+            lat,
+            lng,
+            address,
+            zoneId: zoneId || null,
+            parkedAt: new Date()
+        });
+        console.log("Vehicle location saved");
+        return docRef.id;
+    } catch (error) {
+        console.error("Error saving vehicle location:", error);
+        throw error;
+    }
+};
+
+export const removeVehicleLocation = async (userId: string, eventId: string) => {
+    try {
+        await deleteDoc(doc(db, "parked_vehicles", `${eventId}_${userId}`));
+        console.log("Vehicle location removed");
+    } catch (error) {
+        console.error("Error removing vehicle location:", error);
+        throw error;
+    }
+};
+
+export const getParkedVehicles = (eventId: string, callback: (vehicles: ParkedVehicle[]) => void) => {
+    const q = query(
+        collection(db, "parked_vehicles"),
+        where("eventId", "==", eventId)
+    );
+    return onSnapshot(q, (snapshot) => {
+        const vehicles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ParkedVehicle));
+        callback(vehicles);
+    });
+};
+
+export const getParkedVehicleCount = async (eventId: string): Promise<number> => {
+    try {
+        const q = query(
+            collection(db, "parked_vehicles"),
+            where("eventId", "==", eventId)
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.size;
+    } catch (error) {
+        console.error("Error getting parked vehicle count:", error);
+        return 0;
     }
 };
 
