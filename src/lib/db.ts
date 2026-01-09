@@ -203,6 +203,7 @@ export interface AlertData {
     reach?: number;
     time?: string;
     createdAt?: Date;
+    type?: 'alert' | 'emergency';
     active?: boolean;
 }
 

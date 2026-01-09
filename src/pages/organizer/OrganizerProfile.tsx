@@ -7,10 +7,7 @@ import {
     Building,
     Calendar,
     Edit,
-    Shield,
-    Bell,
     LogOut,
-    ChevronRight,
     Save,
     X
 } from "lucide-react";
@@ -20,16 +17,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OrganizerLayout } from "@/components/organizer/OrganizerLayout";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateUserData } from "@/lib/db";
 import { toast } from "sonner";
 
-const menuItems = [
-    { icon: Bell, label: "Notification Preferences", path: "/organizer/settings" },
-    { icon: Shield, label: "Security Settings", path: "/organizer/settings" },
-    { icon: Building, label: "Organization Details", path: "/organizer/settings" },
-];
+
 
 export const OrganizerProfile = () => {
     const { user, userData, logout } = useAuth();
@@ -243,32 +236,7 @@ export const OrganizerProfile = () => {
                     </Card>
                 </motion.div>
 
-                {/* Menu items */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                >
-                    <Card className="border-border/50">
-                        <CardContent className="p-0">
-                            {menuItems.map((item, index) => (
-                                <NavLink
-                                    key={index}
-                                    to={item.path}
-                                    className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors border-b border-border last:border-b-0"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                                            <item.icon className="w-5 h-5 text-foreground" />
-                                        </div>
-                                        <span className="font-medium text-foreground">{item.label}</span>
-                                    </div>
-                                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                                </NavLink>
-                            ))}
-                        </CardContent>
-                    </Card>
-                </motion.div>
+
 
                 {/* Logout */}
                 <motion.div
