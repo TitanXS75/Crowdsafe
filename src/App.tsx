@@ -33,6 +33,7 @@ import { AlertsBroadcast } from "./pages/organizer/AlertsBroadcast";
 import { EmergencyMonitoring } from "./pages/organizer/EmergencyMonitoring";
 import { Reports } from "./pages/organizer/Reports";
 import { OrganizerProfile } from "./pages/organizer/OrganizerProfile";
+import LiveTracking from "./pages/organizer/LiveTracking";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminProfile } from "./pages/admin/AdminProfile";
 
@@ -73,6 +74,7 @@ const App = () => (
             <Route path="/organizer/event-setup" element={<EventSetup />} />
             <Route path="/organizer/poi" element={<POIManagement />} />
             <Route path="/organizer/crowd" element={<CrowdControl />} />
+            <Route path="/organizer/live-tracking" element={<LiveTracking />} />
             <Route path="/organizer/parking" element={<ParkingManagement />} />
             <Route path="/organizer/alerts" element={<AlertsBroadcast />} />
             <Route path="/organizer/emergencies" element={<EmergencyMonitoring />} />

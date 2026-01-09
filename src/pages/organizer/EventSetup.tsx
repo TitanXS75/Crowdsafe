@@ -57,9 +57,13 @@ export const EventSetup = () => {
     const fetchEvents = async () => {
       if (!user) return;
       try {
+        console.log("🔄 Fetching events from database...");
         const allEvents = await getEvents();
+        console.log("📥 RAW events from database:", allEvents);
         // Filter events by organizer
         const myEvents = allEvents.filter(e => e.organizerId === user.uid);
+        console.log("📥 My filtered events:", myEvents);
+        console.log("📥 First event details:", myEvents[0]);
         setEvents(myEvents);
       } catch (error) {
         console.error("Error fetching events:", error);
@@ -69,6 +73,11 @@ export const EventSetup = () => {
   }, [user]);
 
   const handleSave = async () => {
+    console.log("=== SAVE started ===");
+    console.log("Is editing?", isEditing);
+    console.log("Editing ID:", editingId);
+    console.log("Current event data:", eventData);
+
     if (!eventData.name || !eventData.location || !eventData.startDate) {
       toast({
         title: "Missing Information",
@@ -82,7 +91,16 @@ export const EventSetup = () => {
     try {
       if (isEditing && editingId) {
         // Update existing event
-        await updateEvent(editingId, eventData);
+        console.log("🔄 UPDATING event with ID:", editingId);
+        console.log("📦 Data being sent:", eventData);
+
+        // Make sure we're not sending the ID in the update data
+        const { id, ...dataToUpdate } = eventData;
+        console.log("📤 Final payload (without id):", dataToUpdate);
+
+        await updateEvent(editingId, dataToUpdate);
+        console.log("✅ UPDATE COMPLETED!");
+
         toast({
           title: "Event Updated!",
           description: "Your event has been updated successfully.",
@@ -95,6 +113,7 @@ export const EventSetup = () => {
           organizerEmail: user?.email || "",
           organizerName: userData?.orgName || userData?.name || "",
         };
+        console.log("Creating new event:", eventWithOrganizer);
         await createEvent(eventWithOrganizer);
         toast({
           title: "Event Created!",
@@ -109,10 +128,15 @@ export const EventSetup = () => {
       setEditingId(null);
 
       // Refresh events list
+      console.log("🔄 Refreshing events...");
       const allEvents = await getEvents();
+      console.log("📋 All events:", allEvents.length);
       const myEvents = allEvents.filter(e => e.organizerId === user?.uid);
+      console.log("📋 My events:", myEvents.length);
       setEvents(myEvents);
+      console.log("✅ Events refreshed!");
     } catch (error) {
+      console.error("Save error:", error);
       toast({
         title: "Error",
         description: "Failed to save event.",
@@ -136,6 +160,10 @@ export const EventSetup = () => {
   }, []);
 
   const handleEdit = (event: EventData) => {
+    console.log("📝 EDITING event:", event);
+    console.log("Event ID:", event.id);
+    console.log("Map config:", event.mapConfig);
+    console.log("Facilities:", event.facilities);
     setEventData(event);
     setEditingId(event.id || null);
     setIsEditing(true);
@@ -348,6 +376,7 @@ export const EventSetup = () => {
                   </Alert>
 
                   <MapEditor
+                    key={editingId || 'new'}
                     onConfigChange={handleMapConfigChange}
                     initialConfig={eventData.mapConfig}
                     initialFacilities={eventData.facilities}

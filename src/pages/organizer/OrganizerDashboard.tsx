@@ -8,7 +8,8 @@ import {
   TrendingDown,
   MapPin,
   Clock,
-  Activity
+  Activity,
+  Radio
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,7 +121,37 @@ export const OrganizerDashboard = () => {
           ))}
         </motion.div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        {/* Live Tracking Quick Access */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <Card className="border-primary/30 bg-gradient-to-r from-primary/10 to-primary/5">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center">
+                    <Radio className="w-6 h-6 text-white animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">Live Crowd Tracking</h3>
+                    <p className="text-sm text-muted-foreground">
+                      View real-time attendee locations and heatmaps
+                    </p>
+                  </div>
+                </div>
+                <Button asChild size="lg">
+                  <NavLink to="/organizer/live-tracking">
+                    Open Live Map
+                  </NavLink>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <div className="grid lg:grid-cols-3 gap-6">{/*
           {/* Zone density */}
           <motion.div
             className="lg:col-span-2"
