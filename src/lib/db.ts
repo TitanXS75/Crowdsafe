@@ -391,3 +391,30 @@ export const updateUserData = async (uid: string, data: Partial<UserData>) => {
         throw error;
     }
 };
+
+// Get all users
+export const getAllUsers = async (): Promise<UserData[]> => {
+    try {
+        const usersRef = collection(db, "users");
+        const snapshot = await getDocs(usersRef);
+        const users: UserData[] = [];
+        snapshot.forEach((doc) => {
+            users.push({ ...doc.data() } as UserData);
+        });
+        return users;
+    } catch (error) {
+        console.error("Error getting all users:", error);
+        throw error;
+    }
+};
+
+// Delete user
+export const deleteUser = async (uid: string) => {
+    try {
+        await deleteDoc(doc(db, "users", uid));
+        console.log("User deleted with UID: ", uid);
+    } catch (error) {
+        console.error("Error deleting user:", error);
+        throw error;
+    }
+};

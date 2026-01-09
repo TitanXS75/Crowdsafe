@@ -200,6 +200,27 @@ export const AttendeeMap = () => {
         setLoading(false);
         return;
       }
+
+      // Check if offline mode is enabled
+      const offlineMode = localStorage.getItem("offlineMode") === "true";
+      const mapDataCached = localStorage.getItem("mapDataCached") === "true";
+
+      if (offlineMode && mapDataCached) {
+        // Use cached offline data
+        const offlineData = JSON.parse(localStorage.getItem("offlineEventData") || "{}");
+        if (offlineData.event && offlineData.event.id === storedEvent.id) {
+          console.log("📴 Using offline cached map data");
+          setEvent(offlineData.event);
+          setLoading(false);
+          toast({
+            title: "Offline Mode",
+            description: "Using cached map data (offline).",
+          });
+          return;
+        }
+      }
+
+      // Online mode or no cached data - fetch from Firebase
       try {
         const allEvents = await getEvents();
         const freshEvent = allEvents.find(e => e.id === storedEvent.id);
@@ -211,7 +232,12 @@ export const AttendeeMap = () => {
         }
       } catch (error) {
         console.error("Error fetching event:", error);
+        // Fallback to stored event if online fetch fails
         setEvent(storedEvent);
+        toast({
+          title: "Using Cached Data",
+          description: "Could not fetch latest event data.",
+        });
       } finally {
         setLoading(false);
       }

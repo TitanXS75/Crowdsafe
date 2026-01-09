@@ -11,13 +11,16 @@ import { toast } from "sonner";
 
 export default function AdminAuth() {
     const navigate = useNavigate();
-    const [mode, setMode] = useState<"login" | "signup">("login");
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         email: "",
         password: "",
     });
+
+    // Hardcoded admin credentials
+    const ADMIN_EMAIL = "admin@crowdsafe.com";
+    const ADMIN_PASSWORD = "asdfghjkl;";
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,12 +33,13 @@ export default function AdminAuth() {
         try {
             await new Promise(resolve => setTimeout(resolve, 800));
 
-            if (mode === "login") {
+            // Validate hardcoded credentials
+            if (formData.email === ADMIN_EMAIL && formData.password === ADMIN_PASSWORD) {
                 toast.success("Welcome back! Redirecting to Admin Panel...");
+                navigate("/admin");
             } else {
-                toast.success("Admin account created.");
+                toast.error("Authentication failed", { description: "Invalid email or password" });
             }
-            navigate("/admin");
         } catch (error: any) {
             console.error(error);
             toast.error("Authentication failed", { description: error.message });
@@ -63,7 +67,6 @@ export default function AdminAuth() {
                     </motion.div>
 
                     <motion.form
-                        key={mode}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
@@ -95,13 +98,8 @@ export default function AdminAuth() {
                         </div>
 
                         <Button type="submit" variant="destructive" size="lg" className="w-full" disabled={isLoading}>
-                            {isLoading ? "Verifying..." : mode === "login" ? "Authenticate" : "Register Admin"}
+                            {isLoading ? "Verifying..." : "Authenticate"}
                         </Button>
-
-                        {/* Hidden signup toggle for demo purposes, usually hidden */}
-                        <p className="text-center text-xs text-muted-foreground mt-4 opacity-50 cursor-pointer hover:opacity-100" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
-                            {mode === "login" ? "Register new admin (Demo)" : "Back to login"}
-                        </p>
                     </motion.form>
                 </div>
             </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     LayoutDashboard,
@@ -30,6 +30,13 @@ import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 // Simplified full-width layout without sidebar
 export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     const isOnline = useNetworkStatus();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        // For now, just navigate to home page
+        // In a real app, you'd also clear auth tokens/session
+        navigate("/");
+    };
 
     return (
         <div className="min-h-screen bg-background flex flex-col text-foreground font-sans selection:bg-primary/20">
@@ -72,7 +79,10 @@ export const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                                 </NavLink>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive focus:text-destructive">
+                            <DropdownMenuItem
+                                className="text-destructive focus:text-destructive cursor-pointer"
+                                onClick={handleLogout}
+                            >
                                 <LogOut className="mr-2 h-4 w-4" />
                                 <span>Log out</span>
                             </DropdownMenuItem>

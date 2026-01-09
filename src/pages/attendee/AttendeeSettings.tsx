@@ -31,22 +31,74 @@ const languages = [
 
 export const AttendeeSettings = () => {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
-  const [offlineMode, setOfflineMode] = useState(false);
-  const [mapDownloaded, setMapDownloaded] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(() => {
+    // Load offline mode preference from localStorage
+    return localStorage.getItem("offlineMode") === "true";
+  });
+  const [mapDownloaded, setMapDownloaded] = useState(() => {
+    // Check if map data is already cached
+    return localStorage.getItem("mapDataCached") === "true";
+  });
   const { toast } = useToast();
 
-  const handleDownloadMap = () => {
-    toast({
-      title: "Downloading Map...",
-      description: "Event map will be available offline shortly.",
-    });
-    setTimeout(() => {
+  const handleDownloadMap = async () => {
+    try {
+      const currentEvent = JSON.parse(localStorage.getItem("currentEvent") || "{}");
+
+      if (!currentEvent || !currentEvent.id) {
+        toast({
+          title: "No Event Selected",
+          description: "Please select an event first before downloading the map.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Downloading Map...",
+        description: "Caching event data for offline use.",
+      });
+
+      // Simulate download progress
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Cache the event data for offline use
+      const offlineData = {
+        event: currentEvent,
+        cachedAt: new Date().toISOString(),
+        version: "1.0"
+      };
+
+      // Store in localStorage (for demo - in production, use IndexedDB for larger data)
+      localStorage.setItem("offlineEventData", JSON.stringify(offlineData));
+      localStorage.setItem("mapDataCached", "true");
+
       setMapDownloaded(true);
       toast({
         title: "Map Downloaded!",
-        description: "You can now use the map offline.",
+        description: "You can now use the map offline for this event.",
       });
-    }, 2000);
+    } catch (error) {
+      console.error("Error downloading map:", error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to cache map data. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Save offline mode preference
+  const handleOfflineModeToggle = (checked: boolean) => {
+    setOfflineMode(checked);
+    localStorage.setItem("offlineMode", checked.toString());
+
+    if (checked && !mapDownloaded) {
+      toast({
+        title: "Offline Mode Enabled",
+        description: "Download the event map below to use it offline.",
+      });
+    }
   };
 
   const applyLanguage = (code: string) => {
@@ -157,7 +209,7 @@ export const AttendeeSettings = () => {
                   <p className="font-medium text-foreground">Enable Offline Mode</p>
                   <p className="text-sm text-muted-foreground">Use downloaded map data</p>
                 </div>
-                <Switch checked={offlineMode} onCheckedChange={setOfflineMode} />
+                <Switch checked={offlineMode} onCheckedChange={handleOfflineModeToggle} />
               </div>
 
               <div className="pt-2 border-t border-border">
