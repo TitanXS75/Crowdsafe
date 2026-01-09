@@ -1,0 +1,354 @@
+# CrowdSafe - Development Changes Log
+
+## Session Overview
+**Branch**: mapndata  
+**Date**: January 7, 2026  
+**Session Focus**: UI Refinements, Role-Based Authentication, and Landing Page Redesign
+
+---
+
+## 🎯 Major Changes Implemented
+
+### 1. **Removed Hardcoded Demo Data**
+- **Files Modified**:
+  - `src/components/attendee/AttendeeLayout.tsx`
+  - `src/components/organizer/OrganizerLayout.tsx`
+  - `src/pages/organizer/EventSetup.tsx`
+  - `src/pages/attendee/AttendeeProfile.tsx`
+
+- **Changes**:
+  - Removed "Mega Music Festival 2024" hardcoded references
+  - Updated layouts to read current event from `localStorage`
+  - Replaced fake profile data with generic guest information
+  - Cleared default event data in EventSetup form
+
+---
+
+### 2. **Event Browse & Selection Flow**
+- **New Files Created**:
+  - `src/pages/attendee/EventCatalog.tsx` - Displays all available events from Firestore
+
+- **Files Modified**:
+  - `src/App.tsx` - Added route `/attendee/events`
+  - `src/pages/attendee/AttendeeDashboard.tsx` - Added check for selected event
+
+- **Features**:
+  - "Browse Events" button shown when no event is selected
+  - Event selection stores to localStorage as `currentEvent`
+  - Welcome message dynamically shows selected event name
+  - Event catalog displays all events from database with details
+
+---
+
+### 3. **Role-Based Authentication System**
+
+#### A. **Backend/Database Layer**
+- **Files Modified**:
+  - `src/lib/db.ts`
+    - Added `saveUserRole()` function
+    - Added `getUserRole()` function
+    - Implemented user role storage in Firestore `users` collection
+
+#### B. **Authentication Pages (Separated by Role)**
+- **New Files Created**:
+  - `src/pages/auth/AttendeeAuth.tsx` - Dedicated attendee login/signup
+  - `src/pages/auth/OrganizerAuth.tsx` - Dedicated organizer login/signup
+  - `src/pages/auth/AdminAuth.tsx` - Dedicated admin login/signup
+
+- **Features**:
+  - Each page has unique branding and styling
+  - Role is automatically assigned during signup
+  - Custom background images for each role
+  - Seamless login/signup toggle within each page
+
+#### C. **Route Protection**
+- **New Files Created**:
+  - `src/components/ProtectedRoute.tsx` - Route guard component
+
+- **Access Rules Enforced**:
+  - **Attendee (Role 1)**: Can ONLY access attendee routes
+  - **Organizer (Role 2)**: Can access organizer AND attendee routes
+  - **Admin (Role 3)**: Can access admin AND attendee routes
+
+- **Files Modified**:
+  - `src/App.tsx` - Wrapped all dashboard routes with `ProtectedRoute`
+  - Added routes: `/auth/attendee`, `/auth/organizer`, `/auth/admin`
+  - Removed old generic `/auth` route
+
+---
+
+### 4. **Landing Page Redesign**
+
+#### A. **Role Selection Section**
+- **Files Modified**:
+  - `src/components/RoleSelection.tsx`
+    - Added third card for "Admin" role
+    - Updated grid layout to `lg:grid-cols-3`
+    - Added admin features list (Map Creation, System Configuration, etc.)
+    - Updated button text to "Login as [Role]"
+
+#### B. **Navigation Updates**
+- **Files Modified**:
+  - `src/components/Navbar.tsx`
+    - Changed "Login" and "Sign Up" buttons to scroll to `#roles` section
+    - Changed "Sign Up" text to "Get Started"
+
+  - `src/components/HeroSection.tsx`
+    - Updated CTA buttons to link directly to `/auth/attendee` and `/auth/organizer`
+
+#### C. **Footer Cleanup**
+- **Files Modified**:
+  - `src/components/Footer.tsx`
+    - Removed "Support" section (Help Center, Contact Us, etc.)
+    - Removed "Legal" section (Privacy Policy, Terms, etc.)
+    - Removed `contact@crowdsafe.io` email link
+    - Kept only Brand info, Quick Links, and Copyright
+
+---
+
+### 5. **Visual Enhancements**
+
+#### A. **Authentication Page Backgrounds**
+- **Generated Images**:
+  - `attendee_auth_bg.png` - Festival scene with attendees navigating
+  - `organizer_auth_bg.png` - Event control center with monitoring screens
+  - `admin_auth_bg.png` - Technical workspace with digital maps
+
+- **Implementation**:
+  - Images placed in `public/` folder
+  - Applied as background to right panel of auth pages
+  - Added gradient overlays for text readability
+  - Added backdrop blur and semi-transparent cards for text content
+
+#### B. **Offline Indicator**
+- **New Files Created**:
+  - `src/hooks/useNetworkStatus.ts` - Custom hook to detect online/offline state
+  - `src/components/OfflineIndicator.tsx` - Banner component for offline mode
+
+- **Files Modified**:
+  - `src/components/attendee/AttendeeLayout.tsx` - Integrated OfflineIndicator
+  - `src/components/organizer/OrganizerLayout.tsx` - Integrated OfflineIndicator
+
+- **Features**:
+  - Persistent banner at top when internet connection is lost
+  - Real-time updates using browser `navigator.onLine` API
+
+---
+
+## 🗂️ File Structure Changes
+
+### New Files Added
+```
+src/
+├── components/
+│   ├── OfflineIndicator.tsx
+│   └── ProtectedRoute.tsx
+├── hooks/
+│   └── useNetworkStatus.ts
+├── pages/
+│   ├── attendee/
+│   │   └── EventCatalog.tsx
+│   └── auth/
+│       ├── AttendeeAuth.tsx
+│       ├── OrganizerAuth.tsx
+│       └── AdminAuth.tsx
+public/
+├── attendee_auth_bg.png
+├── organizer_auth_bg.png
+└── admin_auth_bg.png
+```
+
+### Files Removed
+- `src/pages/Auth.tsx` (Replaced by role-specific auth pages)
+
+---
+
+## 🚀 Navigation Flow Changes
+
+### Before
+```
+Landing Page
+    ↓
+/auth (Generic login/signup)
+    ↓
+Dashboard (Based on role selection)
+```
+
+### After
+```
+Landing Page
+    ↓
+#roles Section (Choose your role)
+    ↓
+┌─────────────┬──────────────────┬─────────────┐
+│ /auth/      │ /auth/organizer  │ /auth/admin │
+│ attendee    │                  │             │
+└─────────────┴──────────────────┴─────────────┘
+    ↓               ↓                  ↓
+┌─────────────┬──────────────────┬─────────────┐
+│ /attendee   │ /organizer       │ /admin      │
+│ (Protected) │ (Protected)      │ (Protected) │
+└─────────────┴──────────────────┴─────────────┘
+```
+
+### Event Selection Flow (Attendees)
+```
+/attendee Dashboard
+    ↓
+Check localStorage for 'currentEvent'
+    ↓ (if not found)
+Show "Browse Events" button
+    ↓
+/attendee/events (Event Catalog)
+    ↓
+Select Event → Stores in localStorage
+    ↓
+Return to /attendee Dashboard
+    ↓
+Welcome message: "Welcome to [Event Name]!"
+```
+
+---
+
+## 🔐 Access Control Matrix
+
+| User Role  | Attendee Routes | Organizer Routes | Admin Routes |
+|------------|----------------|------------------|--------------|
+| Attendee   | ✅ Yes         | ❌ No            | ❌ No        |
+| Organizer  | ✅ Yes         | ✅ Yes           | ❌ No        |
+| Admin      | ✅ Yes         | ❌ No            | ✅ Yes       |
+
+---
+
+## 📋 Database Schema Changes
+
+### New Collection: `users`
+```javascript
+{
+  uid: string,           // Firebase Auth UID
+  role: string,          // "attendee" | "organizer" | "admin"
+  email: string,         // User email
+  createdAt: Date        // Account creation timestamp
+}
+```
+
+### Modified Collections
+- None (existing structure maintained)
+
+---
+
+## 🎨 Design Tokens & Styling
+
+### Role-Specific Color Schemes
+- **Attendee**: Primary Blue (`primary`)
+- **Organizer**: Green (`secondary`)
+- **Admin**: Red/Destructive (`destructive`)
+
+### Component Patterns
+- Glass morphism effects for cards
+- Backdrop blur for overlays
+- Gradient backgrounds for visual hierarchy
+- Motion animations using Framer Motion
+
+---
+
+## 🐛 Bug Fixes
+
+1. **Fixed**: Removed accidental markdown syntax (`\`\`\`typescript`) from `AttendeeLayout.tsx`
+2. **Fixed**: Added missing `getFAQs` export in `src/lib/db.ts`
+3. **Fixed**: Closing div tag in `Footer.tsx`
+4. **Fixed**: Template literal errors in `AdminAuth.tsx`
+5. **Fixed**: Image paths for auth backgrounds (moved from artifacts to public folder)
+
+---
+
+## 🔄 Migration Notes
+
+### Breaking Changes
+- Old `/auth` route removed - update any direct links
+- Generic auth removed - must use role-specific routes
+- User roles now required in Firestore for authentication
+
+### Backward Compatibility
+- Existing event data structure unchanged
+- Firebase configuration unchanged
+- Existing Firestore collections maintained
+
+---
+
+## ✅ Testing Checklist
+
+- [x] Attendee can signup and access attendee routes only
+- [x] Organizer can signup and access organizer + attendee routes
+- [x] Admin can signup and access admin + attendee routes
+- [x] Event catalog displays all events from Firestore
+- [x] Event selection persists across page refreshes
+- [x] Offline indicator appears when network is lost
+- [x] Auth background images load correctly
+- [x] Text is visible on all auth page backgrounds
+- [x] Footer displays correctly without removed sections
+- [x] Landing page roles section shows all 3 options
+- [x] Protected routes redirect unauthorized users
+
+---
+
+## 📝 Known Issues & Future Improvements
+
+### Current Limitations
+1. Profile page still uses static/guest data (not integrated with auth)
+2. Admin access to organizer routes not implemented (strict role separation)
+3. No password reset functionality
+4. No email verification on signup
+
+### Suggested Enhancements
+1. Implement full user profile management
+2. Add forgot password flow
+3. Email verification for new accounts
+4. User avatar upload and management
+5. Admin super-user access to all routes
+6. Role change/upgrade functionality
+7. Session timeout and re-authentication
+8. Multi-factor authentication for admin users
+
+---
+
+## 🚦 Deployment Notes
+
+### Required Environment Variables
+- Firebase configuration (unchanged)
+- No new environment variables required
+
+### Build Steps
+1. Ensure all images are in `public/` folder
+2. Run `npm run build` to create production bundle
+3. No additional configuration needed
+
+### Post-Deployment Verification
+1. Test all three auth flows
+2. Verify image loading from CDN/public folder
+3. Check role-based access control
+4. Test event selection and persistence
+5. Verify offline indicator functionality
+
+---
+
+## 📞 Support & Maintenance
+
+### Code Ownership
+- Authentication: `src/pages/auth/*`, `src/components/ProtectedRoute.tsx`
+- Event Management: `src/pages/attendee/EventCatalog.tsx`
+- Role Management: `src/lib/db.ts` (user functions)
+- UI Components: `src/components/OfflineIndicator.tsx`, `src/hooks/useNetworkStatus.ts`
+
+### Documentation
+- User role logic: See `src/components/ProtectedRoute.tsx` comments
+- Event flow: See `src/pages/attendee/AttendeeDashboard.tsx` comments
+- Database helpers: See `src/lib/db.ts` inline documentation
+
+---
+
+**Last Updated**: January 7, 2026  
+**Session Duration**: ~1 hour 30 minutes  
+**Total Files Modified**: 15+  
+**Total Files Created**: 8  
+**Lines of Code Changed**: ~800+
