@@ -18,8 +18,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AttendeeLayout } from "@/components/attendee/AttendeeLayout";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { getParkingZones } from "@/lib/db";
+import { getParkingZonesByEvent, saveVehicleLocation, removeVehicleLocation } from "@/lib/db";
 import { NavigationMap } from "@/components/NavigationMap";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SavedParkingLocation {
   lat: number;
@@ -30,6 +31,7 @@ interface SavedParkingLocation {
 }
 
 export const AttendeeParking = () => {
+  const { user } = useAuth();
   const [parkingZones, setParkingZones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [savedLocation, setSavedLocation] = useState<SavedParkingLocation | null>(null);
@@ -37,6 +39,9 @@ export const AttendeeParking = () => {
   const [savingLocation, setSavingLocation] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
+
+  // Get current event from localStorage
+  const currentEvent = JSON.parse(localStorage.getItem("currentEvent") || "null");
 
   // Load saved parking location from localStorage
   useEffect(() => {
@@ -50,14 +55,20 @@ export const AttendeeParking = () => {
     }
   }, []);
 
-  // Load parking zones
+  // Load parking zones for the current event (only published ones)
   useEffect(() => {
-    const unsubscribe = getParkingZones((zones) => {
-      setParkingZones(zones);
+    if (!currentEvent?.id) {
+      setLoading(false);
+      return;
+    }
+    const unsubscribe = getParkingZonesByEvent(currentEvent.id, (zones) => {
+      // Filter to only show zones that organizers have published
+      const publishedZones = zones.filter((z: any) => z.published === true);
+      setParkingZones(publishedZones);
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentEvent?.id]);
 
   // Get current user location for navigation
   useEffect(() => {
@@ -111,8 +122,24 @@ export const AttendeeParking = () => {
         // Save to localStorage
         localStorage.setItem("parkingLocation", JSON.stringify(parkingData));
         setSavedLocation(parkingData);
-        setSavingLocation(false);
 
+        // Save to Firestore for organizer tracking
+        if (user && currentEvent?.id) {
+          try {
+            await saveVehicleLocation(
+              user.uid,
+              currentEvent.id,
+              latitude,
+              longitude,
+              address,
+              selectedZone?.id
+            );
+          } catch (e) {
+            console.error("Failed to save to Firestore:", e);
+          }
+        }
+
+        setSavingLocation(false);
         toast.success("Parking Location Saved!", {
           description: "You can now navigate back to your car anytime."
         });
@@ -127,9 +154,19 @@ export const AttendeeParking = () => {
     );
   };
 
-  const handleClearLocation = () => {
+  const handleClearLocation = async () => {
     localStorage.removeItem("parkingLocation");
     setSavedLocation(null);
+
+    // Remove from Firestore
+    if (user && currentEvent?.id) {
+      try {
+        await removeVehicleLocation(user.uid, currentEvent.id);
+      } catch (e) {
+        console.error("Failed to remove from Firestore:", e);
+      }
+    }
+
     toast.success("Parking location cleared");
   };
 
