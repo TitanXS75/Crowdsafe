@@ -100,6 +100,30 @@ export const OrganizerLayout = ({ children }: OrganizerLayoutProps) => {
             </Button>
           </div>
 
+          {/* Event Info */}
+          <div className="p-4 border-b border-border">
+            <div className="glass rounded-lg p-3">
+              <p className="text-xs text-muted-foreground">Current Event</p>
+              <p className="font-semibold text-foreground">
+                {JSON.parse(localStorage.getItem("currentEvent") || "{}").name || "No Event Selected"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {JSON.parse(localStorage.getItem("currentEvent") || "{}").location || "--"}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full mt-2 text-xs"
+              onClick={() => {
+                navigate("/organizer/events");
+                setSidebarOpen(false);
+              }}
+            >
+              Switch Event
+            </Button>
+          </div>
+
           {/* Make Event Button */}
           <div className="p-4 border-b border-border">
             <NavLink
@@ -143,6 +167,13 @@ export const OrganizerLayout = ({ children }: OrganizerLayoutProps) => {
 
           {/* Bottom actions */}
           <div className="p-4 border-t border-border space-y-1">
+            <NavLink
+              to="/organizer/settings"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="font-medium">Settings</span>
+            </NavLink>
             <button
               onClick={handleLogout}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-destructive hover:bg-destructive/10 transition-all w-full"

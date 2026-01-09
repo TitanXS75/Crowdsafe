@@ -34,6 +34,8 @@ import { EmergencyMonitoring } from "./pages/organizer/EmergencyMonitoring";
 import { Reports } from "./pages/organizer/Reports";
 import { OrganizerProfile } from "./pages/organizer/OrganizerProfile";
 import LiveTracking from "./pages/organizer/LiveTracking";
+import { OrganizerEventCatalog } from "./pages/organizer/OrganizerEventCatalog";
+import { OrganizerSettings } from "./pages/organizer/OrganizerSettings";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { AdminProfile } from "./pages/admin/AdminProfile";
 
@@ -72,6 +74,8 @@ const App = () => (
             {/* Organizer Routes */}
             <Route path="/organizer" element={<OrganizerDashboard />} />
             <Route path="/organizer/event-setup" element={<EventSetup />} />
+            <Route path="/organizer/events" element={<OrganizerEventCatalog />} />
+            <Route path="/organizer/settings" element={<OrganizerSettings />} />
             <Route path="/organizer/poi" element={<POIManagement />} />
             <Route path="/organizer/crowd" element={<CrowdControl />} />
             <Route path="/organizer/live-tracking" element={<LiveTracking />} />

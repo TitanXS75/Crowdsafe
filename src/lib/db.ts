@@ -191,6 +191,24 @@ export const getEvents = async () => {
     }
 };
 
+// Get events created by a specific organizer
+export const getEventsByOrganizer = async (organizerId: string) => {
+    try {
+        const eventsRef = collection(db, "events");
+        const q = query(eventsRef, where("organizerId", "==", organizerId));
+        const snapshot = await getDocs(q);
+        const events: EventData[] = [];
+        snapshot.forEach((doc) => {
+            const data = { id: doc.id, ...doc.data() };
+            events.push(convertMapConfigFromFirestore(data));
+        });
+        return events;
+    } catch (error) {
+        console.error("Error fetching organizer events:", error);
+        return [];
+    }
+};
+
 
 export const fetchRoutes = async (start: [number, number], end: [number, number], eventId: string) => {
     try {
