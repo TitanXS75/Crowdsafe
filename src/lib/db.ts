@@ -117,14 +117,14 @@ export const deleteEvent = async (id: string) => {
 
 export const getEvents = async () => {
     try {
-        const response = await fetch(`${API_URL}/events`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch events');
-        }
-        const result = await response.json();
-        // Ensure result.data is an array. If backend returns object wrapper, adjust.
-        // My backend returns { status: 'success', data: [...] }
-        return (result.data || []) as EventData[];
+        // Fetch directly from Firestore instead of backend API
+        const eventsRef = collection(db, "events");
+        const snapshot = await getDocs(eventsRef);
+        const events: EventData[] = [];
+        snapshot.forEach((doc) => {
+            events.push({ id: doc.id, ...doc.data() } as EventData);
+        });
+        return events;
     } catch (error) {
         console.error("Error fetching events:", error);
         return [];

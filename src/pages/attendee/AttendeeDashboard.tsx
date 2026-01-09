@@ -307,9 +307,7 @@ export const AttendeeDashboard = () => {
           </div>
         </motion.div>
 
-        {/* Alert Banner */}
-        {latestAlert && (
-          {/* Alert Banner - Emergency vs Standard */ }
+        {/* Alert Banner - Emergency vs Standard */}
         {latestAlert && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}

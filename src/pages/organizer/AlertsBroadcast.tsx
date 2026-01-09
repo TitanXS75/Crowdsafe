@@ -314,165 +314,163 @@ export const AlertsBroadcast = () => {
                   </div>
                 </div>
 
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setShowForm(false)}>
-                  Cancel
-                </Button>
-                {alertData.type === "emergency" ? (
-                  <Button onClick={handleSendEmergency} variant="destructive" className="gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    BROADCAST EMERGENCY
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowForm(false)}>
+                    Cancel
                   </Button>
-                ) : (
-                  <Button onClick={handleSendAlert} className="gap-2">
-                    <Send className="w-4 h-4" />
-                    Send Alert
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  {alertData.type === "emergency" ? (
+                    <Button onClick={handleSendEmergency} variant="destructive" className="gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      BROADCAST EMERGENCY
+                    </Button>
+                  ) : (
+                    <Button onClick={handleSendAlert} className="gap-2">
+                      <Send className="w-4 h-4" />
+                      Send Alert
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
         )}
 
-      {/* Sent alerts */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
-                Active Emergencies
-              </div>
-              {/* Emergency Toggle/Create Button placeholder if needed inline */}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {sentAlerts.filter((a: any) => a.type === "emergency").length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground text-sm">
-                No active emergencies.
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="ml-2"
-                  onClick={() => {
-                    setAlertData(prev => ({ ...prev, type: "emergency", severity: "critical", title: "EMERGENCY: ", zone: "all" }));
-                    setShowForm(true);
-                  }}
-                >
-                  Declare Emergency
-                </Button>
-              </div>
-            ) : (
+        {/* Sent alerts */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  Active Emergencies
+                </div>
+                {/* Emergency Toggle/Create Button placeholder if needed inline */}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {sentAlerts.filter((a: any) => a.type === "emergency").length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  No active emergencies.
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="ml-2"
+                    onClick={() => {
+                      setAlertData(prev => ({ ...prev, type: "emergency", severity: "critical", title: "EMERGENCY: ", zone: "all" }));
+                      setShowForm(true);
+                    }}
+                  >
+                    Declare Emergency
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sentAlerts.filter((a: any) => a.type === "emergency").map((alert) => (
+                    <motion.div
+                      key={alert.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="p-4 rounded-lg border bg-destructive/10 border-destructive/30"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-bold text-destructive flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4" />
+                            {alert.title}
+                          </h3>
+                          <p className="text-sm text-foreground mt-1 font-medium">{alert.message}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/20"
+                          onClick={() => handleDeleteAlert(alert.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="h-6"></div> {/* Spacer */}
+
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                Recent Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-3">
-                {sentAlerts.filter((a: any) => a.type === "emergency").map((alert) => (
-                  <motion.div
-                    key={alert.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="p-4 rounded-lg border bg-destructive/10 border-destructive/30"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-bold text-destructive flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4" />
-                          {alert.title}
-                        </h3>
-                        <p className="text-sm text-foreground mt-1 font-medium">{alert.message}</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/20"
-                        onClick={() => handleDeleteAlert(alert.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                {sentAlerts.filter((a: any) => a.type !== "emergency").map((alert, index) => {
+                  const styles = getSeverityStyles(alert.severity);
+                  const Icon = styles.icon;
 
-        <div className="h-6"></div> {/* Spacer */}
+                  return (
+                    <motion.div
+                      key={alert.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.02 * index }}
+                      className={cn("p-4 rounded-lg border", styles.bg)}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center",
+                          alert.severity === "critical" ? "bg-destructive" :
+                            alert.severity === "warning" ? "bg-amber-500" : "bg-primary"
+                        )}>
+                          <Icon className="w-5 h-5 text-white" />
+                        </div>
 
-        <Card className="border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Bell className="w-5 h-5 text-primary" />
-              Recent Alerts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {sentAlerts.filter((a: any) => a.type !== "emergency").map((alert, index) => {
-                const styles = getSeverityStyles(alert.severity);
-                const Icon = styles.icon;
-
-                return (
-                  <motion.div
-                    key={alert.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.02 * index }}
-                    className={cn("p-4 rounded-lg border", styles.bg)}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center",
-                        alert.severity === "critical" ? "bg-destructive" :
-                          alert.severity === "warning" ? "bg-amber-500" : "bg-primary"
-                      )}>
-                        <Icon className="w-5 h-5 text-white" />
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-semibold text-foreground">{alert.title}</h3>
-                            <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="font-semibold text-foreground">{alert.title}</h3>
+                              <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleDeleteAlert(alert.id)}
+                            >
+                              <Trash2 className="w-4 h-4 text-muted-foreground" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleDeleteAlert(alert.id)}
-                          >
-                            <Trash2 className="w-4 h-4 text-muted-foreground" />
-                          </Button>
-                        </div>
 
-                        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {alert.zone}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(alert.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Bell className="w-3 h-3" />
-                            {alert.reach} reached
-                          </span>
+                          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {alert.zone}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {new Date(alert.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Bell className="w-3 h-3" />
+                              {alert.reach} reached
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
     </OrganizerLayout >
   );
 };
