@@ -102,13 +102,19 @@ export const createEvent = async (eventData: EventData) => {
 
 export const updateEvent = async (id: string, data: Partial<EventData>) => {
     try {
+        console.log("💾 DB: updateEvent called");
+        console.log("ID:", id);
+        console.log("Data before conversion:", data);
+
         const docRef = doc(db, "events", id);
         // Convert nested arrays if mapConfig or facilities are being updated
         const firestoreData = convertMapConfigForFirestore(data as EventData);
+        console.log("Data after Firestore conversion:", firestoreData);
+
         await updateDoc(docRef, firestoreData);
-        console.log("Event updated with ID: ", id);
+        console.log("✅ DB: Firestore updateDoc completed successfully for ID:", id);
     } catch (e) {
-        console.error("Error updating event: ", e);
+        console.error("❌ DB: Error updating event:", e);
         throw e;
     }
 };

@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getDatabase } from "firebase/database";
 import {
     getAuth,
     browserLocalPersistence,
@@ -23,6 +24,7 @@ const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const realtimeDb = getDatabase(app);
 
 // Initialize Auth with IndexedDB persistence for better browser support
 export const auth = initializeAuth(app, {
