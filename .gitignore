@@ -88,3 +88,4 @@ yarn.lock
 pnpm-lock.yaml
 bun.lockb
 backend/serviceAccountKey.json
+backend/service-account.json

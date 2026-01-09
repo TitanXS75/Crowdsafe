@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -14,8 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { OrganizerLayout } from "@/components/organizer/OrganizerLayout";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-
-const initialEmergencies: any[] = [];
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { updateEmergencyStatus, EmergencyRequest } from "@/lib/db";
+import { useAuth } from "@/contexts/AuthContext";
 
 const statusOptions = [
   { id: "all", label: "All" },
@@ -25,24 +27,49 @@ const statusOptions = [
 ];
 
 export const EmergencyMonitoring = () => {
-  const [emergencies, setEmergencies] = useState(initialEmergencies);
+  const { user } = useAuth();
+  const [emergencies, setEmergencies] = useState<EmergencyRequest[]>([]);
   const [filter, setFilter] = useState("all");
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (!user) return;
+
+    // Listen to ALL emergency requests for this organizer's events.
+    const q = query(collection(db, "emergency_requests"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as EmergencyRequest[];
+      // Sort by timestamp desc
+      data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      setEmergencies(data);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const filteredEmergencies = filter === "all"
     ? emergencies
-    : emergencies.filter(e => e.status === filter);
+    : emergencies.filter(e => {
+      if (filter === 'received') return e.status === 'pending';
+      return e.status === filter;
+    });
 
   const activeCount = emergencies.filter(e => e.status !== "resolved").length;
 
-  const updateStatus = (id: number, newStatus: string) => {
-    setEmergencies(prev => prev.map(e =>
-      e.id === id ? { ...e, status: newStatus } : e
-    ));
-    toast({
-      title: "Status Updated",
-      description: `Emergency request marked as ${newStatus}.`,
-    });
+  const updateStatus = async (id: string, newStatus: 'responding' | 'resolved') => {
+    try {
+      await updateEmergencyStatus(id, newStatus, user?.uid);
+      toast({
+        title: "Status Updated",
+        description: `Emergency request marked as ${newStatus}.`,
+      });
+    } catch (error) {
+      console.error("Failed to update status", error);
+      toast({
+        title: "Error",
+        description: "Failed to update status.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getTypeIcon = (type: string) => {
@@ -56,18 +83,11 @@ export const EmergencyMonitoring = () => {
 
   const getStatusStyles = (status: string) => {
     switch (status) {
+      case "pending": return "bg-destructive text-destructive-foreground";
       case "received": return "bg-destructive text-destructive-foreground";
       case "responding": return "bg-amber-500 text-white";
       case "resolved": return "bg-secondary text-secondary-foreground";
       default: return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const getPriorityStyles = (priority: string) => {
-    switch (priority) {
-      case "high": return "border-destructive bg-destructive/5";
-      case "medium": return "border-amber-500/50 bg-amber-500/5";
-      default: return "border-border";
     }
   };
 
@@ -112,7 +132,10 @@ export const EmergencyMonitoring = () => {
               {opt.label}
               {opt.id !== "all" && (
                 <span className="ml-1 text-xs">
-                  ({emergencies.filter(e => e.status === opt.id).length})
+                  ({emergencies.filter(e => {
+                    if (opt.id === 'received') return e.status === 'pending';
+                    return e.status === opt.id;
+                  }).length})
                 </span>
               )}
             </Button>
@@ -133,7 +156,7 @@ export const EmergencyMonitoring = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.02 * index }}
               >
-                <Card className={cn("border transition-all", getPriorityStyles(emergency.priority))}>
+                <Card className="border transition-all border-border">
                   <CardContent className="p-4">
                     <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                       {/* Type icon */}
@@ -160,32 +183,38 @@ export const EmergencyMonitoring = () => {
                           )}>
                             {emergency.status}
                           </span>
-                          {emergency.priority === "high" && (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/20 text-destructive">
-                              High Priority
-                            </span>
-                          )}
                         </div>
 
-                        <p className="text-muted-foreground">{emergency.description}</p>
+                        <p className="text-muted-foreground">
+                          {emergency.description ? `"${emergency.description}"` : "Active Emergency"}
+                        </p>
 
                         <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <MapPin className="w-4 h-4" />
-                            {emergency.location}
+                            {emergency.location ? (
+                              <a
+                                href={`https://www.google.com/maps?q=${emergency.location.lat},${emergency.location.lng}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline hover:text-primary"
+                              >
+                                {emergency.location.label || "View on Map"}
+                              </a>
+                            ) : "Unknown Location"}
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="w-4 h-4" />
-                            {emergency.time}
+                            {emergency.timestamp?.seconds ? new Date(emergency.timestamp.seconds * 1000).toLocaleTimeString() : "Just now"}
                           </span>
                         </div>
                       </div>
 
                       {/* Actions */}
                       <div className="flex items-center gap-2">
-                        {emergency.status === "received" && (
+                        {emergency.status === "pending" && (
                           <Button
-                            onClick={() => updateStatus(emergency.id, "responding")}
+                            onClick={() => updateStatus(emergency.id!, "responding")}
                             className="gap-1"
                           >
                             <ArrowRight className="w-4 h-4" />
@@ -195,7 +224,7 @@ export const EmergencyMonitoring = () => {
                         {emergency.status === "responding" && (
                           <Button
                             variant="secondary"
-                            onClick={() => updateStatus(emergency.id, "resolved")}
+                            onClick={() => updateStatus(emergency.id!, "resolved")}
                             className="gap-1"
                           >
                             <Check className="w-4 h-4" />

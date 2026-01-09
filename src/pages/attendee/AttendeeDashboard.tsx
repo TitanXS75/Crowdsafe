@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AttendeeLayout } from "@/components/attendee/AttendeeLayout";
 import { NavLink, useNavigate } from "react-router-dom";
-import { getEvents, EventData, getActiveAlerts, AlertData } from "@/lib/db";
+import { getEvents, EventData, getActiveAlerts, AlertData, incrementActiveUsers, decrementActiveUsers } from "@/lib/db";
 import { toast } from "sonner";
 import { SOSCheckInModal } from "@/components/SOSCheckInModal";
 import { SOSPopup } from "@/components/SOSPopup";
@@ -129,6 +129,19 @@ export const AttendeeDashboard = () => {
 
     fetchEvent();
   }, []);
+
+  // Real-time Active User Tracking
+  useEffect(() => {
+    if (currentEvent?.id) {
+      // Increment on mount/event load
+      incrementActiveUsers(currentEvent.id);
+
+      // Decrement on unmount/event change
+      return () => {
+        decrementActiveUsers(currentEvent.id!);
+      };
+    }
+  }, [currentEvent?.id]);
 
   // Get user's location
   useEffect(() => {
