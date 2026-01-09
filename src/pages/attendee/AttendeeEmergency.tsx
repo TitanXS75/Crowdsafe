@@ -10,8 +10,11 @@ import {
   Send,
   Check,
   Clock,
-  Navigation
+  Navigation,
+  Loader2
 } from "lucide-react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AttendeeLayout } from "@/components/attendee/AttendeeLayout";
@@ -64,6 +67,8 @@ export const AttendeeEmergency = () => {
   const [requestSent, setRequestSent] = useState(false);
   const [sharingLocation, setSharingLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [requestStatus, setRequestStatus] = useState<'pending' | 'responding' | 'resolved'>('pending');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -113,7 +118,8 @@ export const AttendeeEmergency = () => {
 
         const userId = "temp-attendee-id"; // Use real auth ID if available, otherwise anonymous/temp
 
-        await createEmergencyRequest({
+        console.log("📍 Creating emergency request with eventId:", currentEvent.id);
+        const newRequestId = await createEmergencyRequest({
           type: selectedType === "other" ? "Manual" : emergencyTypes.find(t => t.id === selectedType)?.label || "Emergency",
           description: selectedType === "other" ? manualDescription : "",
           userId: userId,
@@ -127,6 +133,9 @@ export const AttendeeEmergency = () => {
           timestamp: new Date()
         });
 
+        console.log("✅ Emergency request created successfully! ID:", newRequestId);
+        setRequestId(newRequestId); // Store the ID to listen to it
+        setRequestStatus('pending');
         setRequestSent(true);
         toast({
           title: "Help is on the way!",
@@ -166,6 +175,27 @@ export const AttendeeEmergency = () => {
     // The previous handleCall logic is removed.
   };
 
+  // Real-time status monitoring
+  useEffect(() => {
+    if (!requestId) return;
+
+    const unsubscribe = onSnapshot(doc(db, "emergency_requests", requestId), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        setRequestStatus(data.status);
+        if (data.status === 'resolved') {
+          toast({
+            title: "Emergency Resolved",
+            description: "Staff has marked this incident as resolved.",
+            variant: "default", // or success if available
+          });
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [requestId]);
+
   if (requestSent) {
     return (
       <AttendeeLayout>
@@ -173,14 +203,38 @@ export const AttendeeEmergency = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-center max-w-md"
+            className="text-center max-w-md w-full px-4"
           >
-            <div className="w-20 h-20 rounded-full bg-secondary/20 mx-auto mb-6 flex items-center justify-center">
-              <Check className="w-10 h-10 text-secondary" />
+            {/* Dynamic Status Icon */}
+            <div className={cn(
+              "w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center animate-pulse",
+              requestStatus === 'responding' ? "bg-amber-500/20" :
+                requestStatus === 'resolved' ? "bg-green-500/20" :
+                  "bg-secondary/20"
+            )}>
+              {requestStatus === 'responding' ? (
+                <Navigation className="w-12 h-12 text-amber-500" />
+              ) : requestStatus === 'resolved' ? (
+                <Check className="w-12 h-12 text-green-500" />
+              ) : (
+                <Loader2 className="w-12 h-12 text-secondary animate-spin" />
+              )}
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Help is On The Way!</h1>
-            <p className="text-muted-foreground mb-6">
-              Emergency responders have been notified of your location and are heading to you now.
+
+            {/* Dynamic Title */}
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              {requestStatus === 'responding' ? "Help is Coming!" :
+                requestStatus === 'resolved' ? "Resolved" :
+                  "Request Sent"}
+            </h1>
+
+            {/* Dynamic Message */}
+            <p className="text-muted-foreground mb-8 text-lg">
+              {requestStatus === 'responding'
+                ? "Staff has seen your request and is on the way."
+                : requestStatus === 'resolved'
+                  ? "This emergency request has been marked as resolved."
+                  : "Waiting for staff acknowledgement..."}
             </p>
 
             <Card className="glass border-border/50 mb-4">
@@ -192,43 +246,53 @@ export const AttendeeEmergency = () => {
                     </div>
                     <div className="text-left">
                       <p className="font-medium text-foreground">Location Shared</p>
-                      <p className="text-sm text-muted-foreground">Zone A - Near Gate 2</p>
+                      <p className="text-sm text-muted-foreground">Live Tracking Active</p>
                     </div>
                   </div>
-                  <span className="text-secondary text-sm font-medium">Live</span>
+                  <span className={cn(
+                    "text-xs font-bold px-2 py-1 rounded-full uppercase",
+                    requestStatus === 'responding' ? "bg-amber-100 text-amber-700" :
+                      "bg-secondary/20 text-secondary"
+                  )}>
+                    {requestStatus === 'pending' ? 'Sent' : requestStatus}
+                  </span>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass border-border/50 mb-6">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-foreground">Estimated Arrival</p>
-                    <p className="text-sm text-muted-foreground">2-3 minutes</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {requestStatus !== 'resolved' && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground animate-pulse">
+                  Keep this screen open (or minimized) so we can track you.
+                </p>
+                <Button
+                  variant="ghost"
+                  className="w-full text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setRequestSent(false);
+                    setSelectedType(null);
+                    setManualDescription("");
+                    setSharingLocation(false);
+                    setRequestId(null);
+                  }}
+                >
+                  Cancel Request
+                </Button>
+              </div>
+            )}
 
-            {/* Removed Call Button as per request */}
-            <div className="space-y-3">
+            {requestStatus === 'resolved' && (
               <Button
-                variant="ghost"
-                className="w-full"
+                className="w-full mt-4"
                 onClick={() => {
                   setRequestSent(false);
-                  setSelectedType(null);
-                  setManualDescription("");
-                  setSharingLocation(false);
+                  setRequestId(null);
+                  // navigate('/attendee/dashboard'); // Optional
                 }}
               >
-                Cancel Request
+                Return to Dashboard
               </Button>
-            </div>
+            )}
           </motion.div>
         </div>
       </AttendeeLayout>

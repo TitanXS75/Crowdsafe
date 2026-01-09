@@ -39,6 +39,8 @@ export const EmergencyMonitoring = () => {
     const q = query(collection(db, "emergency_requests"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as EmergencyRequest[];
+      console.log("📋 Emergency requests loaded:", data.length, "requests");
+      console.log("📋 Emergency requests data:", data);
       // Sort by timestamp desc
       data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
       setEmergencies(data);
@@ -142,104 +144,187 @@ export const EmergencyMonitoring = () => {
           ))}
         </motion.div>
 
-        {/* Emergency list */}
+        {/* Emergency Requests Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
+          className="grid lg:grid-cols-2 gap-6"
         >
-          <div className="space-y-4">
-            {filteredEmergencies.map((emergency, index) => (
-              <motion.div
-                key={emergency.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.02 * index }}
-              >
-                <Card className="border transition-all border-border">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                      {/* Type icon */}
-                      <div className="flex items-center gap-4">
-                        <span className="text-3xl">{getTypeIcon(emergency.type)}</span>
-                        <div className="lg:hidden">
-                          <h3 className="font-semibold text-foreground">{emergency.type}</h3>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-xs font-medium capitalize inline-block mt-1",
-                            getStatusStyles(emergency.status)
-                          )}>
-                            {emergency.status}
-                          </span>
-                        </div>
-                      </div>
+          {/* Active Requests Column */}
+          <div>
+            <Card className="border-destructive/30 bg-destructive/5">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-destructive animate-pulse" />
+                  Active Requests ({filteredEmergencies.filter(e => e.status !== "resolved").length})
+                </CardTitle>
+                <CardDescription>
+                  Pending and responding emergency requests
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {filteredEmergencies.filter(e => e.status !== "resolved").length > 0 ? (
+                  filteredEmergencies.filter(e => e.status !== "resolved").map((emergency, index) => (
+                    <motion.div
+                      key={emergency.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.02 * index }}
+                    >
+                      <Card className="border-red-500/20 bg-card shadow-red-500/10 shadow-sm">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">{getTypeIcon(emergency.type)}</span>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-foreground">{emergency.type}</h3>
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded-full text-xs font-medium capitalize animate-pulse",
+                                  getStatusStyles(emergency.status)
+                                )}>
+                                  {emergency.status}
+                                </span>
+                              </div>
 
-                      {/* Details */}
-                      <div className="flex-1">
-                        <div className="hidden lg:flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-foreground">{emergency.type}</h3>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-xs font-medium capitalize",
-                            getStatusStyles(emergency.status)
-                          )}>
-                            {emergency.status}
-                          </span>
-                        </div>
+                              {emergency.description && (
+                                <p className="text-muted-foreground text-sm mb-2 italic">
+                                  "{emergency.description}"
+                                </p>
+                              )}
 
-                        <p className="text-muted-foreground">
-                          {emergency.description ? `"${emergency.description}"` : "Active Emergency"}
-                        </p>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />
+                                  {emergency.location ? (
+                                    <a
+                                      href={`https://www.google.com/maps?q=${emergency.location.lat},${emergency.location.lng}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="underline hover:text-primary"
+                                    >
+                                      {emergency.location.label || "View Map"}
+                                    </a>
+                                  ) : "Unknown"}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {emergency.timestamp?.seconds ? new Date(emergency.timestamp.seconds * 1000).toLocaleTimeString() : "Just now"}
+                                </span>
+                              </div>
 
-                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            {emergency.location ? (
-                              <a
-                                href={`https://www.google.com/maps?q=${emergency.location.lat},${emergency.location.lng}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline hover:text-primary"
-                              >
-                                {emergency.location.label || "View on Map"}
-                              </a>
-                            ) : "Unknown Location"}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {emergency.timestamp?.seconds ? new Date(emergency.timestamp.seconds * 1000).toLocaleTimeString() : "Just now"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
-                        {emergency.status === "pending" && (
-                          <Button
-                            onClick={() => updateStatus(emergency.id!, "responding")}
-                            className="gap-1"
-                          >
-                            <ArrowRight className="w-4 h-4" />
-                            Respond
-                          </Button>
-                        )}
-                        {emergency.status === "responding" && (
-                          <Button
-                            variant="secondary"
-                            onClick={() => updateStatus(emergency.id!, "resolved")}
-                            className="gap-1"
-                          >
-                            <Check className="w-4 h-4" />
-                            Resolve
-                          </Button>
-                        )}
-                        <Button variant="outline" size="icon">
-                          <Phone className="w-4 h-4" />
-                        </Button>
-                      </div>
+                              <div className="flex gap-2">
+                                {emergency.status === "pending" && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => updateStatus(emergency.id!, "responding")}
+                                    className="gap-1"
+                                  >
+                                    <ArrowRight className="w-3 h-3" />
+                                    Respond
+                                  </Button>
+                                )}
+                                {emergency.status === "responding" && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => updateStatus(emergency.id!, "resolved")}
+                                    className="gap-1"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                    Resolve
+                                  </Button>
+                                )}
+                                <Button variant="outline" size="sm">
+                                  <Phone className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 rounded-full bg-green-500/20 mx-auto mb-3 flex items-center justify-center">
+                      <Check className="w-6 h-6 text-green-500" />
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                    <p className="text-sm text-muted-foreground">No active emergency requests</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Resolved Requests Column */}
+          <div>
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Check className="w-5 h-5 text-green-500" />
+                  Resolved Requests ({filteredEmergencies.filter(e => e.status === "resolved").length})
+                </CardTitle>
+                <CardDescription>
+                  Successfully handled emergency requests
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {filteredEmergencies.filter(e => e.status === "resolved").length > 0 ? (
+                  filteredEmergencies.filter(e => e.status === "resolved").map((emergency, index) => (
+                    <motion.div
+                      key={emergency.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.02 * index }}
+                    >
+                      <Card className="border-border/50 bg-muted/30">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl opacity-60">{getTypeIcon(emergency.type)}</span>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-foreground">{emergency.type}</h3>
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded-full text-xs font-medium capitalize",
+                                  getStatusStyles(emergency.status)
+                                )}>
+                                  {emergency.status}
+                                </span>
+                              </div>
+
+                              {emergency.description && (
+                                <p className="text-muted-foreground text-sm mb-2 italic">
+                                  "{emergency.description}"
+                                </p>
+                              )}
+
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  Resolved {emergency.resolvedAt?.seconds ? new Date(emergency.resolvedAt.seconds * 1000).toLocaleTimeString() : "Recently"}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Check className="w-3 h-3" />
+                                  By {emergency.resolvedBy || "Staff"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                      <AlertTriangle className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">No resolved requests yet</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </motion.div>
 
@@ -247,7 +332,7 @@ export const EmergencyMonitoring = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-12"
+            className="col-span-2 text-center py-12"
           >
             <div className="w-16 h-16 rounded-full bg-secondary/20 mx-auto mb-4 flex items-center justify-center">
               <Check className="w-8 h-8 text-secondary" />
