@@ -1,6 +1,8 @@
 
 import { useState } from "react";
 import { NavLink, useLocation, Navigate, useNavigate } from "react-router-dom";
+import { SOSPopup } from "../SOSPopup";
+import { SOSCheckInModal } from "../SOSCheckInModal";
 import {
   Map,
   Car,
@@ -230,6 +232,10 @@ export const AttendeeLayout = ({ children }: AttendeeLayoutProps) => {
           </div>
         </nav>
       </div>
+
+      {/* SOS Components */}
+      <SOSPopup />
+      <SOSCheckInModal />
     </div>
   );
 };

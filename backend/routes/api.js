@@ -34,9 +34,9 @@ const crowdService = require('../services/crowdService');
 // ============================================
 
 // Get all events
-router.get('/events', (req, res) => {
+router.get('/events', async (req, res) => {
     try {
-        const events = eventService.getAllEvents();
+        const events = await eventService.getAllEvents();
         res.json({
             status: 'success',
             data: events
@@ -50,9 +50,9 @@ router.get('/events', (req, res) => {
 });
 
 // Get single event
-router.get('/events/:id', (req, res) => {
+router.get('/events/:id', async (req, res) => {
     try {
-        const event = eventService.getEventById(req.params.id);
+        const event = await eventService.getEventById(req.params.id);
         if (!event) {
             return res.status(404).json({
                 status: 'error',
@@ -72,7 +72,7 @@ router.get('/events/:id', (req, res) => {
 });
 
 // Create new event
-router.post('/events', (req, res) => {
+router.post('/events', async (req, res) => {
     try {
         const eventData = req.body;
 
@@ -84,7 +84,7 @@ router.post('/events', (req, res) => {
             });
         }
 
-        const newEvent = eventService.createEvent(eventData);
+        const newEvent = await eventService.createEvent(eventData);
 
 
         res.status(201).json({
@@ -101,9 +101,9 @@ router.post('/events', (req, res) => {
 });
 
 // Update event
-router.put('/events/:id', (req, res) => {
+router.put('/events/:id', async (req, res) => {
     try {
-        const updatedEvent = eventService.updateEvent(req.params.id, req.body);
+        const updatedEvent = await eventService.updateEvent(req.params.id, req.body);
         if (!updatedEvent) {
             return res.status(404).json({
                 status: 'error',
@@ -124,9 +124,9 @@ router.put('/events/:id', (req, res) => {
 });
 
 // Delete event
-router.delete('/events/:id', (req, res) => {
+router.delete('/events/:id', async (req, res) => {
     try {
-        const deletedEvent = eventService.deleteEvent(req.params.id);
+        const deletedEvent = await eventService.deleteEvent(req.params.id);
         if (!deletedEvent) {
             return res.status(404).json({
                 status: 'error',
@@ -209,7 +209,6 @@ const transporter = nodemailer.createTransport({
 router.post('/send-sos', async (req, res) => {
     const { eventId, alertDetails } = req.body;
     const { db } = require('../config/firebase');
-    const { collection, getDocs, addDoc } = require('firebase/firestore');
 
     if (!eventId || !alertDetails) {
         return res.status(400).json({ status: 'error', message: 'Missing eventId or alert details' });
@@ -219,7 +218,7 @@ router.post('/send-sos', async (req, res) => {
 
     try {
         // 1. Create Alert in Firestore (Server-side)
-        const alertRef = await addDoc(collection(db, "alerts"), {
+        const alertRef = await db.collection("alerts").add({
             ...alertDetails,
             eventId,
             active: true,
@@ -229,9 +228,17 @@ router.post('/send-sos', async (req, res) => {
         console.log(`[SOS] Alert created in Firestore: ${alertRef.id}`);
 
         // 2. Fetch Attendees from Firestore
-        const attendeesRef = collection(db, "events", eventId, "active_attendees");
-        const snapshot = await getDocs(attendeesRef);
-        const recipients = snapshot.docs.map(doc => doc.data().email).filter(Boolean);
+        const attendeesRef = db.collection("events").doc(eventId).collection("active_attendees");
+        console.log(`[SOS] Querying attendees at path: events/${eventId}/active_attendees`);
+
+        const attendeesSnapshot = await attendeesRef.get();
+        console.log(`[SOS] Snapshot empty? ${attendeesSnapshot.empty}, Size: ${attendeesSnapshot.size}`);
+
+        const recipients = attendeesSnapshot.docs.map(doc => {
+            const data = doc.data();
+            console.log(`[SOS] Found candidate: ${data.email} (UID: ${doc.id})`);
+            return data.email;
+        }).filter(Boolean);
 
         console.log(`[SOS] Found ${recipients.length} recipients`);
 
@@ -302,5 +309,4 @@ Please follow safety instructions immediately.
         res.status(500).json({ status: 'error', message: 'Failed to complete broadcast: ' + error.message });
     }
 });
-
 module.exports = router;

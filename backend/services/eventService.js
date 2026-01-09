@@ -1,24 +1,20 @@
-const events = [];
+const { db } = require('../config/firebase');
 
-// Helper to generate a simple unique ID
-const generateId = () => {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+const getAllEvents = async () => {
+    const snapshot = await db.collection('events').get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
-const getAllEvents = () => {
-    return events;
+const getEventById = async (id) => {
+    const doc = await db.collection('events').doc(id).get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
 };
 
-const getEventById = (id) => {
-    return events.find(event => event.id === id);
-};
-
-const createEvent = (eventData) => {
+const createEvent = async (eventData) => {
     const newEvent = {
-        id: generateId(),
         createdAt: new Date().toISOString(),
         ...eventData,
-        // Ensure mapConfig exists even if empty
         mapConfig: eventData.mapConfig || {
             center: null,
             zoom: 13,
@@ -27,27 +23,22 @@ const createEvent = (eventData) => {
             routes: []
         }
     };
-    events.push(newEvent);
-    return newEvent;
+
+    // Add to Firestore
+    const docRef = await db.collection('events').add(newEvent);
+    return { id: docRef.id, ...newEvent };
 };
 
-const updateEvent = (id, eventData) => {
-    const index = events.findIndex(e => e.id === id);
-    if (index !== -1) {
-        events[index] = { ...events[index], ...eventData };
-        return events[index];
-    }
-    return null;
+const updateEvent = async (id, eventData) => {
+    const eventRef = db.collection('events').doc(id);
+    await eventRef.update(eventData);
+    const doc = await eventRef.get();
+    return { id: doc.id, ...doc.data() };
 };
 
-const deleteEvent = (id) => {
-    const index = events.findIndex(e => e.id === id);
-    if (index !== -1) {
-        const deleted = events[index];
-        events.splice(index, 1);
-        return deleted;
-    }
-    return null;
+const deleteEvent = async (id) => {
+    await db.collection('events').doc(id).delete();
+    return { id };
 };
 
 module.exports = {

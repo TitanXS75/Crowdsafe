@@ -20,21 +20,27 @@ import { useParams } from "react-router-dom";
 
 export function SOSCheckInModal() {
     const { user } = useAuth();
-    const { id: eventId } = useParams(); // Start tracking when on event page
+    const { id: paramId } = useParams();
+
+    // Fallback to localStorage if no param
+    const storedEvent = JSON.parse(localStorage.getItem("currentEvent") || "{}");
+    const eventId = paramId || storedEvent.id;
+
     const [isOpen, setIsOpen] = useState(false);
     const [email, setEmail] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        // Only show if user is logged in and on an event page
+        // Only show if user is logged in and we have a valid eventId
         if (user && eventId) {
             // Check if already checked in? (Optional: optimize by checking LS or Firestore)
-            // For now, simple logic: Show once per session per event
             const hasCheckedIn = sessionStorage.getItem(`sos-checkin-${eventId}`);
             if (!hasCheckedIn) {
                 setEmail(user.email || "");
                 setIsOpen(true);
             }
+        } else if (!eventId) {
+            console.warn("SOSCheckIn: No Event ID found in URL or LocalStorage");
         }
     }, [user, eventId]);
 
@@ -44,13 +50,16 @@ export function SOSCheckInModal() {
         setIsSubmitting(true);
         try {
             // 1. Save to Firestore so Backend can find them
-            await setDoc(doc(db, "events", eventId, "active_attendees", user.uid), {
+            console.log("Checking in user:", user.uid, "to event:", eventId);
+            const checkInRef = doc(db, "events", eventId, "active_attendees", user.uid);
+            await setDoc(checkInRef, {
                 uid: user.uid,
                 email: email,
                 name: user.displayName || "Anonymous",
                 checkedInAt: serverTimestamp(),
                 lastActive: serverTimestamp(),
             });
+            console.log("Check-in success at path:", checkInRef.path);
 
             // 2. Local session flag
             sessionStorage.setItem(`sos-checkin-${eventId}`, "true");

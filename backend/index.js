@@ -3,7 +3,9 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 
 // Load environment variables
-dotenv.config();
+// Load environment variables from root directory
+const path = require('path');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,8 +26,8 @@ app.use('/api', apiRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'ok', 
+    res.json({
+        status: 'ok',
         message: 'CrowdSafe Backend Server is running',
         timestamp: new Date().toISOString()
     });
@@ -33,7 +35,7 @@ app.get('/health', (req, res) => {
 
 // Root endpoint
 app.get('/', (req, res) => {
-    res.json({ 
+    res.json({
         message: 'Welcome to CrowdSafe API',
         version: '1.0.0',
         endpoints: {
@@ -46,17 +48,17 @@ app.get('/', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error:', err.stack);
-    res.status(500).json({ 
+    res.status(500).json({
         error: 'Something went wrong!',
-        message: err.message 
+        message: err.message
     });
 });
 
 // 404 handler
 app.use((req, res) => {
-    res.status(404).json({ 
+    res.status(404).json({
         error: 'Not Found',
-        message: `Route ${req.originalUrl} not found` 
+        message: `Route ${req.originalUrl} not found`
     });
 });
 

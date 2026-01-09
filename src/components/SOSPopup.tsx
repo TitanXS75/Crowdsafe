@@ -14,11 +14,15 @@ interface AlertData {
     zone: string;
     time: string;
     active: boolean;
+    eventId: string; // Added missing property
 }
 
 export function SOSPopup({ eventId: propEventId }: { eventId?: string }) {
     const { id: paramEventId } = useParams();
-    const eventId = propEventId || paramEventId;
+    // Fallback to localStorage if no prop or param
+    const storedEvent = JSON.parse(localStorage.getItem("currentEvent") || "{}");
+    const eventId = propEventId || paramEventId || storedEvent.id;
+
     const [alert, setAlert] = useState<AlertData | null>(null);
     const [isOpen, setIsOpen] = useState(false);
 
@@ -26,35 +30,100 @@ export function SOSPopup({ eventId: propEventId }: { eventId?: string }) {
         if (!eventId) return;
 
         // Listen for the most recent active alert for this event
+        console.log(`[SOSPopup] Listening for alerts for Event ID: ${eventId}`);
+
+        // SIMPLIFIED QUERY: Listen to 'alerts' collection ordered by time
+        // We filter client-side to avoid needing a complex Firestore composite index
         const q = query(
             collection(db, "alerts"),
-            where("eventId", "==", eventId),
-            where("active", "==", true),
             orderBy("createdAt", "desc"),
-            limit(1)
+            limit(10)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            if (!snapshot.empty) {
-                const newAlert = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as AlertData;
+            console.log(`[SOSPopup] Snapshot received. Docs: ${snapshot.size}`);
+
+            if (snapshot.empty) {
+                console.log("[SOSPopup] No alerts found in DB.");
+                return;
+            }
+
+            // Client-side filtering: Find the latest active alert for THIS event
+            const relevantAlert = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as AlertData))
+                .find(a => a.eventId === eventId && a.active === true);
+
+            if (relevantAlert) {
+                console.log("[SOSPopup] Relevant active alert found:", relevantAlert);
+
+                // CHECK ACKNOWLEDGEMENT STATUS
+                const acked = JSON.parse(localStorage.getItem("acknowledgedAlerts") || "[]");
+                if (acked.includes(relevantAlert.id)) {
+                    console.log("[SOSPopup] Alert already acknowledged. Skipping popup.");
+                    return;
+                }
+
                 // Only trigger if we get a new alert or if the alert is different
                 setAlert(prev => {
-                    if (prev?.id !== newAlert.id) {
+                    if (prev?.id !== relevantAlert.id) {
+                        console.log("[SOSPopup] New alert detected! Opening popup.");
                         setIsOpen(true);
-                        // Optional: Play sound or vibrate here
-                        return newAlert;
+
+                        // PLAY EMERGENCY SOUND
+                        try {
+                            const audio = new Audio("/sounds/emergency-alert.mp3");
+                            audio.loop = false; // Play only once
+                            audio.play().catch(e => console.log("Audio autoplay blocked by browser:", e));
+                            // Store audio reference in window to stop it later if needed (optional optimization)
+                            (window as any).currentSOSAudio = audio;
+                        } catch (e) {
+                            console.error("Audio setup failed", e);
+                        }
+
+                        return relevantAlert;
                     }
                     return prev;
                 });
             } else {
-                // If alert is deactivated, close popup
+                // If no relevant active alert is found, close popup
+                console.log("[SOSPopup] No relevant active alerts for this event.");
                 setIsOpen(false);
                 setAlert(null);
+                // Stop audio if it was playing
+                if ((window as any).currentSOSAudio) {
+                    (window as any).currentSOSAudio.pause();
+                    (window as any).currentSOSAudio = null;
+                }
             }
+        }, (error) => {
+            console.error("[SOSPopup] Snapshot error:", error);
         });
 
-        return () => unsubscribe();
+        return () => {
+            unsubscribe();
+            // Cleanup audio on unmount
+            if ((window as any).currentSOSAudio) {
+                (window as any).currentSOSAudio.pause();
+                (window as any).currentSOSAudio = null;
+            }
+        };
     }, [eventId]);
+
+    const handleAcknowledge = () => {
+        if (alert) {
+            const acked = JSON.parse(localStorage.getItem("acknowledgedAlerts") || "[]");
+            if (!acked.includes(alert.id)) {
+                acked.push(alert.id);
+                localStorage.setItem("acknowledgedAlerts", JSON.stringify(acked));
+            }
+        }
+        setIsOpen(false);
+        // Stop audio
+        if ((window as any).currentSOSAudio) {
+            (window as any).currentSOSAudio.pause();
+            (window as any).currentSOSAudio = null;
+        }
+    };
 
     const getSeverityStyles = (severity: string) => {
         switch (severity) {
@@ -104,7 +173,7 @@ export function SOSPopup({ eventId: propEventId }: { eventId?: string }) {
                     <Button
                         size="lg"
                         variant="destructive"
-                        onClick={() => setIsOpen(false)}
+                        onClick={handleAcknowledge}
                         className="w-full text-lg font-bold py-6 shadow-xl hover:scale-[1.02] transition-transform"
                     >
                         I ACKNOWLEDGE
