@@ -81,12 +81,28 @@ const InteractiveMap = ({ config, facilities, routes, selectedRouteId, onRouteSe
                 {onMapClick && <MapEventController onMapClick={onMapClick} />}
 
                 {/* Draw Boundaries */}
-                {config.boundaries && config.boundaries.length > 0 && (
-                    <Polygon
-                        positions={config.boundaries}
-                        pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
-                    />
-                )}
+                {config.boundaries && config.boundaries.length > 0 && (() => {
+                    // Check if boundaries is a flat array of coordinates (single polygon) or array of polygons
+                    const firstItem = config.boundaries[0];
+                    if (Array.isArray(firstItem) && typeof firstItem[0] === 'number') {
+                        // It's a flat array - treat as single polygon
+                        return (
+                            <Polygon
+                                positions={config.boundaries}
+                                pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
+                            />
+                        );
+                    } else {
+                        // It's an array of polygons - render each one
+                        return config.boundaries.map((polygon: any, idx: number) => (
+                            <Polygon
+                                key={`boundary-${idx}`}
+                                positions={polygon}
+                                pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
+                            />
+                        ));
+                    }
+                })()}
 
                 {/* Draw Restricted Zones */}
                 {config.restrictedZones && config.restrictedZones.map((pos, idx) => (

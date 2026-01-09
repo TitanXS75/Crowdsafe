@@ -53,20 +53,49 @@ export interface EventData {
     organizerName?: string;
     createdAt?: Date;
 }
-
 // Events
 const API_URL = 'http://localhost:5000/api';
 
+// Helper to convert nested arrays to objects for Firestore compatibility
+// Firestore doesn't support nested arrays like [number, number][]
+const convertMapConfigForFirestore = (eventData: EventData): any => {
+    if (!eventData.mapConfig) return eventData;
+
+    const convertCoords = (coords: [number, number][] | undefined) =>
+        coords?.map(([lat, lng]) => ({ lat, lng })) || [];
+
+    return {
+        ...eventData,
+        mapConfig: {
+            ...eventData.mapConfig,
+            center: eventData.mapConfig.center
+                ? { lat: eventData.mapConfig.center[0], lng: eventData.mapConfig.center[1] }
+                : null,
+            boundaries: convertCoords(eventData.mapConfig.boundaries),
+            restrictedZones: convertCoords(eventData.mapConfig.restrictedZones),
+        },
+        // Also convert facilities location if present
+        facilities: eventData.facilities?.map(f => ({
+            ...f,
+            location: f.location ? { lat: f.location[0], lng: f.location[1] } : null
+        }))
+    };
+};
+
 export const createEvent = async (eventData: EventData) => {
     try {
+        console.log("Creating event with data:", eventData);
+        const firestoreData = convertMapConfigForFirestore(eventData);
         const docRef = await addDoc(collection(db, "events"), {
-            ...eventData,
+            ...firestoreData,
             createdAt: new Date()
         });
         console.log("Event created with ID: ", docRef.id);
         return docRef.id;
-    } catch (e) {
+    } catch (e: any) {
         console.error("Error creating event: ", e);
+        console.error("Error code:", e?.code);
+        console.error("Error message:", e?.message);
         throw e;
     }
 };
@@ -74,7 +103,9 @@ export const createEvent = async (eventData: EventData) => {
 export const updateEvent = async (id: string, data: Partial<EventData>) => {
     try {
         const docRef = doc(db, "events", id);
-        await updateDoc(docRef, data);
+        // Convert nested arrays if mapConfig or facilities are being updated
+        const firestoreData = convertMapConfigForFirestore(data as EventData);
+        await updateDoc(docRef, firestoreData);
         console.log("Event updated with ID: ", id);
     } catch (e) {
         console.error("Error updating event: ", e);
@@ -92,6 +123,50 @@ export const deleteEvent = async (id: string) => {
     }
 };
 
+// Helper to convert Firestore objects back to arrays for Leaflet compatibility
+// Firestore stores {lat, lng} but Leaflet expects [lat, lng]
+const convertMapConfigFromFirestore = (eventData: any): EventData => {
+    if (!eventData.mapConfig) return eventData;
+
+    const convertToArray = (coords: any[] | undefined): [number, number][] => {
+        if (!coords || !Array.isArray(coords)) return [];
+        return coords.map((c: any) => {
+            if (Array.isArray(c)) return c as [number, number];
+            if (c && typeof c === 'object' && 'lat' in c && 'lng' in c) {
+                return [c.lat, c.lng] as [number, number];
+            }
+            return [0, 0] as [number, number]; // fallback
+        }).filter(c => c[0] !== 0 || c[1] !== 0); // filter out invalid
+    };
+
+    const convertCenter = (center: any): [number, number] | undefined => {
+        if (!center) return undefined;
+        if (Array.isArray(center)) return center as [number, number];
+        if (typeof center === 'object' && 'lat' in center && 'lng' in center) {
+            return [center.lat, center.lng];
+        }
+        return undefined;
+    };
+
+    return {
+        ...eventData,
+        mapConfig: {
+            ...eventData.mapConfig,
+            center: convertCenter(eventData.mapConfig.center),
+            boundaries: convertToArray(eventData.mapConfig.boundaries),
+            restrictedZones: convertToArray(eventData.mapConfig.restrictedZones),
+        },
+        facilities: eventData.facilities?.map((f: any) => ({
+            ...f,
+            location: f.location
+                ? (Array.isArray(f.location)
+                    ? f.location
+                    : [f.location.lat, f.location.lng])
+                : undefined
+        }))
+    };
+};
+
 export const getEvents = async () => {
     try {
         // Fetch directly from Firestore instead of backend API
@@ -99,7 +174,9 @@ export const getEvents = async () => {
         const snapshot = await getDocs(eventsRef);
         const events: EventData[] = [];
         snapshot.forEach((doc) => {
-            events.push({ id: doc.id, ...doc.data() } as EventData);
+            const data = { id: doc.id, ...doc.data() };
+            // Convert Firestore format back to array format for Leaflet
+            events.push(convertMapConfigFromFirestore(data));
         });
         return events;
     } catch (error) {
