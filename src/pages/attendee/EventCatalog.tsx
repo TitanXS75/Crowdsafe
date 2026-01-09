@@ -45,47 +45,55 @@ export const EventCatalog = () => {
                         <p className="text-muted-foreground">No events found.</p>
                     </div>
                 ) : (
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-4">
                         {events.map((event) => (
                             <motion.div
                                 key={event.id}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                whileHover={{ scale: 1.02 }}
+                                whileHover={{ scale: 1.01 }}
                                 transition={{ duration: 0.2 }}
                             >
-                                <Card className="h-full border-border/50 hover:shadow-lg transition-shadow">
-                                    <CardHeader>
-                                        <CardTitle className="text-xl text-primary">{event.name}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <p className="text-muted-foreground line-clamp-2">
-                                            {event.description}
-                                        </p>
-
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                <Calendar className="w-4 h-4" />
-                                                <span>{event.startDate} - {event.endDate}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                <MapPin className="w-4 h-4" />
-                                                <span>{event.location}</span>
-                                            </div>
-                                            {event.startTime && (
-                                                <div className="flex items-center gap-2 text-muted-foreground">
-                                                    <Clock className="w-4 h-4" />
-                                                    <span>{event.startTime} - {event.endTime}</span>
+                                <Card className="border-border/50 hover:shadow-lg transition-all hover:border-primary/50">
+                                    <CardContent className="p-6">
+                                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                                            {/* Event Info */}
+                                            <div className="flex-1 space-y-3">
+                                                <div>
+                                                    <CardTitle className="text-2xl text-primary mb-2">{event.name}</CardTitle>
+                                                    <p className="text-muted-foreground line-clamp-2">
+                                                        {event.description}
+                                                    </p>
                                                 </div>
-                                            )}
-                                        </div>
 
-                                        <Button
-                                            className="w-full mt-4"
-                                            onClick={() => handleSelectEvent(event)}
-                                        >
-                                            Enter Event
-                                        </Button>
+                                                <div className="flex flex-wrap gap-4 text-sm">
+                                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                                        <Calendar className="w-4 h-4" />
+                                                        <span>{event.startDate} - {event.endDate}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                                        <MapPin className="w-4 h-4" />
+                                                        <span>{event.location}</span>
+                                                    </div>
+                                                    {event.startTime && (
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Clock className="w-4 h-4" />
+                                                            <span>{event.startTime} - {event.endTime}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Action Button */}
+                                            <div className="lg:w-40 flex-shrink-0">
+                                                <Button
+                                                    className="w-full h-12 text-base font-semibold"
+                                                    onClick={() => handleSelectEvent(event)}
+                                                >
+                                                    Enter Event
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </CardContent>
                                 </Card>
                             </motion.div>
