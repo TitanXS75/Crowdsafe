@@ -10,11 +10,16 @@ let serviceAccount;
 try {
     // Try to load service account key file
     serviceAccount = require('../serviceAccountKey.json');
+    console.log("Using Firebase credentials from serviceAccountKey.json");
 } catch (error) {
     console.warn("WARNING: serviceAccountKey.json not found in backend/.");
 
     // Fallback to environment variables
-    if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    if (
+        process.env.FIREBASE_PROJECT_ID &&
+        process.env.FIREBASE_CLIENT_EMAIL &&
+        process.env.FIREBASE_PRIVATE_KEY
+    ) {
         console.log("Using Firebase credentials from environment variables.");
         serviceAccount = {
             projectId: process.env.FIREBASE_PROJECT_ID,
@@ -22,7 +27,9 @@ try {
             privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
         };
     } else {
-        console.error("CRITICAL: No Firebase credentials found (File or Env). SOS features will fail.");
+        console.error(
+            "CRITICAL: No Firebase credentials found (File or Env). Firebase features will fail."
+        );
     }
 }
 
@@ -42,8 +49,14 @@ if (!admin.apps.length) {
 }
 
 // Export a robust db object that throws clearer errors if accessed when not initialized
-const db = admin.apps.length ? admin.firestore() : {
-    collection: () => { throw new Error("Firebase not initialized. check backend credentials."); }
-};
+const db = admin.apps.length
+    ? admin.firestore()
+    : {
+          collection: () => {
+              throw new Error(
+                  "Firebase not initialized. Check backend credentials."
+              );
+          }
+      };
 
 module.exports = { db };

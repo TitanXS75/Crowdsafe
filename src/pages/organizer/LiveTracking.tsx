@@ -8,23 +8,47 @@ import { Label } from '@/components/ui/label';
 import { OrganizerLayout } from '@/components/organizer/OrganizerLayout';
 import { NavLink } from 'react-router-dom';
 import LiveCrowdMap from '@/components/LiveCrowdMap';
+import { useEffect } from 'react';
+
+import { getEvents, EventData, getActiveAlerts, AlertData, getEventRealtime } from "@/lib/db";
 
 const LiveTracking = () => {
     const [showHeatmap, setShowHeatmap] = useState(true);
     const [showStats, setShowStats] = useState(true);
     const [event, setEvent] = useState<any>(null);
+    const [activeAttendees, setActiveAttendees] = useState(0);
 
     // Load current event from localStorage
     useState(() => {
         const storedEvent = localStorage.getItem("currentEvent");
         if (storedEvent) {
             try {
-                setEvent(JSON.parse(storedEvent));
+                const parsedEvent = JSON.parse(storedEvent);
+                setEvent(parsedEvent);
+                // Initialize active count from stored event if available, though it might be stale
+                setActiveAttendees(parsedEvent.activeAttendees || 0);
             } catch (error) {
                 console.error("Error parsing event:", error);
             }
         }
     });
+
+    // Real-time listener for event data (including activeAttendees)
+    useEffect(() => {
+        if (!event?.id) return;
+
+        const unsubscribe = getEventRealtime(event.id, (updatedEvent) => {
+            if (updatedEvent) {
+                // Update local stats
+                setActiveAttendees(updatedEvent.activeAttendees || 0);
+
+                // Optional: Update full event object if needed, but be careful of re-renders
+                // setEvent(prev => ({ ...prev, ...updatedEvent }));
+            }
+        });
+
+        return () => unsubscribe();
+    }, [event?.id]);
 
     // If no event is selected, show a message
     if (!event) {
@@ -171,7 +195,7 @@ const LiveTracking = () => {
                                 <CardContent className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-muted-foreground">Total Attendees</span>
-                                        <span className="font-semibold">0</span>
+                                        <span className="font-semibold">{activeAttendees}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-muted-foreground">Safe</span>

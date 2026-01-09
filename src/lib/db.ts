@@ -13,7 +13,8 @@ import {
     onSnapshot,
     orderBy,
     deleteDoc,
-    setDoc
+    setDoc,
+    increment
 } from "firebase/firestore";
 
 // POI/Facility interface
@@ -52,6 +53,7 @@ export interface EventData {
     organizerEmail?: string;
     organizerName?: string;
     createdAt?: Date;
+    activeAttendees?: number;
 }
 // Events
 const API_URL = 'http://localhost:5000/api';
@@ -191,6 +193,41 @@ export const getEvents = async () => {
     }
 };
 
+export const incrementActiveUsers = async (eventId: string) => {
+    try {
+        const eventRef = doc(db, "events", eventId);
+        await updateDoc(eventRef, {
+            activeAttendees: increment(1)
+        });
+        console.log("Incremented active users for", eventId);
+    } catch (error) {
+        console.error("Error incrementing active users:", error);
+    }
+};
+
+export const decrementActiveUsers = async (eventId: string) => {
+    try {
+        const eventRef = doc(db, "events", eventId);
+        // We might want to check if it's already 0, but Firestore increment(-1) is standard
+        await updateDoc(eventRef, {
+            activeAttendees: increment(-1)
+        });
+        console.log("Decremented active users for", eventId);
+    } catch (error) {
+        console.error("Error decrementing active users:", error);
+    }
+};
+
+export const getEventRealtime = (eventId: string, callback: (event: EventData) => void) => {
+    const eventRef = doc(db, "events", eventId);
+    return onSnapshot(eventRef, (doc) => {
+        if (doc.exists()) {
+            const data = { id: doc.id, ...doc.data() };
+            callback(convertMapConfigFromFirestore(data));
+        }
+    });
+};
+
 
 export const fetchRoutes = async (start: [number, number], end: [number, number], eventId: string) => {
     try {
@@ -267,6 +304,23 @@ export interface AlertData {
     active?: boolean;
 }
 
+export interface EmergencyRequest {
+    id?: string;
+    type: string;
+    description?: string; // For manual type
+    userId: string;
+    eventId: string;
+    location?: {
+        lat: number;
+        lng: number;
+        label?: string; // e.g. "Zone A"
+    };
+    status: 'pending' | 'responding' | 'resolved';
+    timestamp: any;
+    resolvedAt?: any;
+    resolvedBy?: string;
+}
+
 // Get all alerts (real-time listener)
 export const getAlerts = (callback: (alerts: AlertData[]) => void) => {
     const q = query(collection(db, "alerts")); // Removed orderBy to avoid index error
@@ -314,6 +368,56 @@ export const createAlert = async (data: Omit<AlertData, 'id' | 'time' | 'created
         console.error("Error creating alert:", error);
         throw error;
     }
+};
+
+// Create Emergency Request
+export const createEmergencyRequest = async (data: EmergencyRequest) => {
+    try {
+        const docRef = await addDoc(collection(db, "emergency_requests"), {
+            ...data,
+            timestamp: new Date(),
+            status: 'pending'
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error("Error creating emergency request:", error);
+        throw error;
+    }
+};
+
+// Update Emergency Request Status
+export const updateEmergencyStatus = async (id: string, status: 'responding' | 'resolved', resolverId?: string) => {
+    try {
+        const docRef = doc(db, "emergency_requests", id);
+        await updateDoc(docRef, {
+            status,
+            resolvedAt: status === 'resolved' ? new Date() : null,
+            resolvedBy: resolverId || null
+        });
+    } catch (error) {
+        console.error("Error updating emergency status:", error);
+        throw error;
+    }
+};
+
+// Get Active Emergency Requests (Real-time)
+export const getActiveEmergencyRequests = (eventId: string, callback: (requests: EmergencyRequest[]) => void) => {
+    // Basic query for now, can add compound index later if needed
+    const q = query(
+        collection(db, "emergency_requests"),
+        where("eventId", "==", eventId),
+        where("status", "in", ["pending", "responding"])
+    );
+    return onSnapshot(q, (snapshot) => {
+        const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as EmergencyRequest[];
+        // Sort by timestamp desc
+        requests.sort((a, b) => {
+            const tA = a.timestamp?.seconds || 0;
+            const tB = b.timestamp?.seconds || 0;
+            return tB - tA;
+        });
+        callback(requests);
+    });
 };
 
 // Delete an alert

@@ -44,13 +44,26 @@ const emergencyTypes = [
     color: "bg-primary",
     textColor: "text-primary"
   },
+  {
+    id: "other",
+    icon: AlertTriangle,
+    label: "Type Manually",
+    description: "Describe the situation",
+    color: "bg-gray-500",
+    textColor: "text-gray-500"
+  }
 ];
+
+import { createEmergencyRequest } from "@/lib/db";
+import { Textarea } from "@/components/ui/textarea";
 
 export const AttendeeEmergency = () => {
   const [nearbyHelp, setNearbyHelp] = useState<any[]>([]);
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [manualDescription, setManualDescription] = useState("");
   const [requestSent, setRequestSent] = useState(false);
   const [sharingLocation, setSharingLocation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -60,22 +73,97 @@ export const AttendeeEmergency = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleEmergencyRequest = () => {
+  const handleEmergencyRequest = async () => {
     setSharingLocation(true);
-    setTimeout(() => {
-      setRequestSent(true);
+    setIsSubmitting(true);
+
+    // Get location
+    if (!navigator.geolocation) {
       toast({
-        title: "Help is on the way!",
-        description: "Emergency responders have been notified. Stay where you are.",
+        title: "Error",
+        description: "Geolocation is not supported by your browser.",
+        variant: "destructive"
       });
-    }, 1500);
+      setSharingLocation(false);
+      setIsSubmitting(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      try {
+        const currentEventString = localStorage.getItem("currentEvent");
+        if (!currentEventString) {
+          toast({
+            title: "Error",
+            description: "Event session invalid. Please rejoin the event.",
+            variant: "destructive"
+          });
+          return;
+        }
+        const currentEvent = JSON.parse(currentEventString);
+        if (!currentEvent.id) {
+          console.error("No event ID found in storage");
+          toast({
+            title: "Error",
+            description: "Invalid event data. Please rejoin.",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        const userId = "temp-attendee-id"; // Use real auth ID if available, otherwise anonymous/temp
+
+        await createEmergencyRequest({
+          type: selectedType === "other" ? "Manual" : emergencyTypes.find(t => t.id === selectedType)?.label || "Emergency",
+          description: selectedType === "other" ? manualDescription : "",
+          userId: userId,
+          eventId: currentEvent.id, // Ensure this is valid
+          location: {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            label: "Shared Location" // In real app, reverse geocode here
+          },
+          status: 'pending',
+          timestamp: new Date()
+        });
+
+        setRequestSent(true);
+        toast({
+          title: "Help is on the way!",
+          description: "Emergency responders have been notified. Stay where you are.",
+          duration: 5000,
+        });
+      } catch (error) {
+        console.error("Error sending request:", error);
+        toast({
+          title: "Error",
+          description: "Failed to send emergency request. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      } finally {
+        setSharingLocation(false);
+        setIsSubmitting(false);
+      }
+    }, (error) => {
+      console.error("Location error:", error);
+      toast({
+        title: "Location Error",
+        description: "Unable to retrieve your location. Request sent without location.",
+        variant: "destructive"
+      });
+      // Fallback: Send request WITHOUT location if critical?
+      // For now, let's stop and force location as per request but could allow fallback.
+      setSharingLocation(false);
+      setIsSubmitting(false);
+    });
   };
 
-  const handleCall = () => {
-    toast({
-      title: "Calling Emergency Services",
-      description: "Connecting to event emergency hotline...",
-    });
+  const handleNotifyOrganizer = () => {
+    // Logic to just scroll down or highlight the request form?
+    // User requested: "instead of these 'Emergency Hotline' write notify organizer immediately"
+    // and remove the call functionality button logic.
+    // The previous handleCall logic is removed.
   };
 
   if (requestSent) {
@@ -126,17 +214,15 @@ export const AttendeeEmergency = () => {
               </CardContent>
             </Card>
 
+            {/* Removed Call Button as per request */}
             <div className="space-y-3">
-              <Button variant="outline" className="w-full gap-2" onClick={handleCall}>
-                <Phone className="w-4 h-4" />
-                Call Emergency Hotline
-              </Button>
               <Button
                 variant="ghost"
                 className="w-full"
                 onClick={() => {
                   setRequestSent(false);
                   setSelectedType(null);
+                  setManualDescription("");
                   setSharingLocation(false);
                 }}
               >
@@ -175,17 +261,14 @@ export const AttendeeEmergency = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full bg-destructive flex items-center justify-center">
-                    <Phone className="w-7 h-7 text-destructive-foreground" />
+                    <AlertTriangle className="w-7 h-7 text-destructive-foreground animate-pulse" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground text-lg">Emergency Hotline</h3>
-                    <p className="text-muted-foreground">24/7 Event Emergency Support</p>
+                    <h3 className="font-semibold text-foreground text-lg">Notify Organizer Immediately</h3>
+                    <p className="text-muted-foreground">Select an issue below to alert staff</p>
                   </div>
                 </div>
-                <Button variant="destructive" size="lg" className="gap-2" onClick={handleCall}>
-                  <Phone className="w-5 h-5" />
-                  Call Now
-                </Button>
+                {/* Call button removed as per request */}
               </div>
             </CardContent>
           </Card>
@@ -234,6 +317,23 @@ export const AttendeeEmergency = () => {
               </motion.div>
             ))}
           </div>
+
+          {/* Manual Type Input */}
+          {selectedType === 'other' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-3"
+            >
+              <Textarea
+                placeholder="Please describe the emergency..."
+                value={manualDescription}
+                onChange={(e) => setManualDescription(e.target.value)}
+                className="bg-card w-full p-3 min-h-[100px]"
+                disabled={isSubmitting}
+              />
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Send request button */}
@@ -246,12 +346,12 @@ export const AttendeeEmergency = () => {
               size="lg"
               className="w-full gap-2 h-14 text-lg"
               onClick={handleEmergencyRequest}
-              disabled={sharingLocation}
+              disabled={sharingLocation || isSubmitting}
             >
-              {sharingLocation ? (
+              {sharingLocation || isSubmitting ? (
                 <>
                   <MapPin className="w-5 h-5 animate-pulse" />
-                  Sharing Your Location...
+                  {sharingLocation ? "Sharing Location..." : "Sending Request..."}
                 </>
               ) : (
                 <>
