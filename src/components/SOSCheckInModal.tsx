@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { db } from "@/lib/firebase";
-import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import {
     Dialog,
@@ -49,13 +49,24 @@ export function SOSCheckInModal() {
 
         setIsSubmitting(true);
         try {
-            // 1. Save to Firestore so Backend can find them
+            // Get user's name from users collection
+            let userName = user.displayName || "";
+            try {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (userDoc.exists()) {
+                    userName = userDoc.data().name || userName;
+                }
+            } catch (e) {
+                console.log("Could not fetch user name", e);
+            }
+
+            // Save to Firestore so Backend can find them
             console.log("Checking in user:", user.uid, "to event:", eventId);
             const checkInRef = doc(db, "events", eventId, "active_attendees", user.uid);
             await setDoc(checkInRef, {
                 uid: user.uid,
                 email: email,
-                name: user.displayName || "Anonymous",
+                name: userName || email.split('@')[0], // Use email prefix as fallback
                 checkedInAt: serverTimestamp(),
                 lastActive: serverTimestamp(),
             });
