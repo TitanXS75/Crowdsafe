@@ -67,7 +67,7 @@ export function SOSPanel() {
         setIsSending(true);
         try {
             // Get API URL from environment variable, fallback to localhost for development
-            const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+            const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5003";
 
             // Updated Flow: Delegate all SOS logic (Alert Creation + Email) to Backend
             const response = await fetch(`${API_URL}/api/send-sos`, {
