@@ -31,7 +31,7 @@ interface OrganizerLayoutProps {
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/organizer" },
   { icon: MapPin, label: "POI Management", path: "/organizer/poi" },
-  { icon: Users, label: "Crowd Control", path: "/organizer/crowd" },
+
   { icon: Car, label: "Parking", path: "/organizer/parking" },
   { icon: Bell, label: "Alerts", path: "/organizer/alerts" },
   { icon: BarChart3, label: "Reports", path: "/organizer/reports" },
