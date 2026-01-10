@@ -17,7 +17,8 @@ import {
   ArrowRightLeft,
   Bell,
   AlertCircle,
-  Info
+  Info,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -214,11 +215,35 @@ export const AttendeeDashboard = () => {
       if (eventAlerts.length > 0) {
         // Prioritize emergency alerts
         const emergency = eventAlerts.find(a => a.type === "emergency");
+
+        let newAlert: AlertData | null = null;
         if (emergency) {
-          setLatestAlert(emergency);
+          newAlert = emergency;
         } else {
-          setLatestAlert(eventAlerts[0]); // Get the most recent alert
+          newAlert = eventAlerts[0]; // Get the most recent alert
         }
+
+        const dismissed = JSON.parse(localStorage.getItem("dismissedAlerts") || "[]");
+
+        // Play sound if it's a new alert (not dismissed) and different from previous
+        if (newAlert && !dismissed.includes(newAlert.id)) {
+          setLatestAlert(prev => {
+            if (prev?.id !== newAlert!.id) {
+              // Play sound
+              try {
+                const audio = new Audio("/sounds/emergency-alert.mp3");
+                audio.volume = 0.5; // Slightly lower volume for dashboard alerts
+                audio.play().catch(e => console.log("Audio autoplay blocked:", e));
+              } catch (e) {
+                console.error("Audio play failed:", e);
+              }
+            }
+            return newAlert;
+          });
+        } else {
+          setLatestAlert(newAlert);
+        }
+
       } else {
         setLatestAlert(null);
       }
@@ -310,57 +335,76 @@ export const AttendeeDashboard = () => {
           </div>
         </motion.div>
 
-        {/* Alert Banner - Emergency vs Standard */}
-        {latestAlert && (
+        {/* Alert Banner - Compact Design */}
+        {latestAlert && !JSON.parse(localStorage.getItem("dismissedAlerts") || "[]").includes(latestAlert.id) && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
+            className="mb-4"
           >
             {latestAlert.type === 'emergency' ? (
-              // EMERGENCY BLOCK
-              <Card className="bg-destructive border-destructive text-destructive-foreground animate-pulse">
-                <CardContent className="p-6 flex flex-col items-center text-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center animate-bounce">
-                    <AlertTriangle className="w-8 h-8 text-white" />
+              // EMERGENCY BLOCK (Kept prominent but slightly more compact)
+              <div className="bg-destructive text-destructive-foreground rounded-lg p-4 shadow-lg animate-pulse relative overflow-hidden">
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 animate-bounce">
+                    <AlertTriangle className="w-6 h-6 text-white" />
                   </div>
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-bold uppercase tracking-wider">{latestAlert.title}</h2>
-                    <p className="text-lg font-medium opacity-90">{latestAlert.message}</p>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-lg font-bold uppercase tracking-wider leading-tight">{latestAlert.title}</h2>
+                    <p className="text-sm font-medium opacity-90 truncate">{latestAlert.message}</p>
                   </div>
-                  <div className="w-full h-1 bg-white/20 rounded-full my-2" />
-                  <p className="text-sm font-semibold uppercase tracking-widest opacity-75">
-                    Follow Official Instructions Immediately
-                  </p>
-                </CardContent>
-              </Card>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive-foreground hover:bg-white/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const dismissed = JSON.parse(localStorage.getItem("dismissedAlerts") || "[]");
+                      if (!dismissed.includes(latestAlert.id)) {
+                        dismissed.push(latestAlert.id);
+                        localStorage.setItem("dismissedAlerts", JSON.stringify(dismissed));
+                        // Force re-render/update
+                        setLatestAlert(null);
+                      }
+                    }}
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+              </div>
             ) : (
-              // Standard Alert Banner
-              <NavLink to="/attendee/alerts">
-                <Card className={`cursor-pointer transition-all hover:shadow-md ${latestAlert.severity === 'critical' ? 'bg-destructive/10 border-destructive/30' :
-                  latestAlert.severity === 'warning' ? 'bg-amber-500/10 border-amber-500/30' :
-                    'bg-primary/10 border-primary/30'
-                  }`}>
-                  <CardContent className="p-3 flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${latestAlert.severity === 'critical' ? 'bg-destructive' :
-                      latestAlert.severity === 'warning' ? 'bg-amber-500' :
-                        'bg-primary'
-                      }`}>
-                      {latestAlert.severity === 'critical' ? (
-                        <AlertTriangle className="w-4 h-4 text-white" />
-                      ) : latestAlert.severity === 'warning' ? (
-                        <AlertCircle className="w-4 h-4 text-white" />
-                      ) : (
-                        <Info className="w-4 h-4 text-white" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-foreground truncate">{latestAlert.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{latestAlert.message}</p>
-                    </div>
-                    <Bell className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  </CardContent>
-                </Card>
-              </NavLink>
+              // Standard Alert Banner - Compact & Red
+              <div
+                className="relative rounded-lg shadow-md p-3 flex items-center gap-3 bg-red-600 text-white cursor-pointer hover:bg-red-700 transition-colors"
+                onClick={() => navigate("/attendee/alerts")}
+              >
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 animate-pulse">
+                  <Bell className="w-6 h-6 text-white" />
+                </div>
+
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="font-bold text-base uppercase tracking-wide">{latestAlert.title}</p>
+                  <p className="text-sm font-medium opacity-90 truncate">{latestAlert.message}</p>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const dismissed = JSON.parse(localStorage.getItem("dismissedAlerts") || "[]");
+                    if (!dismissed.includes(latestAlert.id)) {
+                      dismissed.push(latestAlert.id);
+                      localStorage.setItem("dismissedAlerts", JSON.stringify(dismissed));
+                      // Force update
+                      setLatestAlert(null);
+                    }
+                  }}
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
             )}
           </motion.div>
         )}
