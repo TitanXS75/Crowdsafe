@@ -30,6 +30,7 @@ import {
   getEvents,
   EventData
 } from "@/lib/db";
+import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -63,19 +64,23 @@ export const ParkingManagement = () => {
   const [newZone, setNewZone] = useState({ name: "", capacity: 50 });
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Load organizer's events
+  // Load organizer's events (only events created by this organizer)
   useEffect(() => {
     const loadEvents = async () => {
+      if (!user) return;
       const allEvents = await getEvents();
-      setEvents(allEvents);
+      // Filter to only show events created by this organizer
+      const organizerEvents = allEvents.filter(e => e.organizerId === user.uid);
+      setEvents(organizerEvents);
       // Auto-select first event if available
-      if (allEvents.length > 0 && !selectedEventId) {
-        setSelectedEventId(allEvents[0].id || "");
+      if (organizerEvents.length > 0 && !selectedEventId) {
+        setSelectedEventId(organizerEvents[0].id || "");
       }
     };
     loadEvents();
-  }, []);
+  }, [user]);
 
   // Load parking zones for selected event
   useEffect(() => {
@@ -181,10 +186,6 @@ export const ParkingManagement = () => {
     }
   };
 
-  // Default map center - get from selected event if available
-  const selectedEvent = events.find(e => e.id === selectedEventId);
-  const mapCenter: [number, number] = selectedEvent?.mapConfig?.center || [20.0, 73.8];
-
   return (
     <OrganizerLayout>
       <div className="space-y-6">
@@ -262,53 +263,36 @@ export const ParkingManagement = () => {
           </Card>
         </motion.div>
 
-        {/* Heat Map */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-        >
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-primary" />
-                Parking Overview
-              </CardTitle>
-              <CardDescription>
-                {vehicles.length} vehicles currently parked
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[400px] rounded-lg overflow-hidden border bg-muted">
-                <iframe
-                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter[1] - 0.01},${mapCenter[0] - 0.01},${mapCenter[1] + 0.01},${mapCenter[0] + 0.01}&layer=mapnik`}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  title="Parking Map"
-                />
-              </div>
-              {vehicles.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm font-medium">Parked Vehicles:</p>
-                  <div className="grid gap-2 max-h-40 overflow-y-auto">
-                    {vehicles.map((vehicle, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-sm p-2 bg-muted rounded">
-                        <span>🚗</span>
-                        <span className="text-muted-foreground">{vehicle.address}</span>
-                      </div>
-                    ))}
-                  </div>
+        {/* Parked Vehicles List */}
+        {vehicles.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Car className="w-5 h-5 text-primary" />
+                  Parked Vehicles ({vehicles.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-2 max-h-60 overflow-y-auto">
+                  {vehicles.map((vehicle, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm p-3 bg-muted rounded-lg">
+                      <span>🚗</span>
+                      <span className="text-muted-foreground flex-1">{vehicle.address}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {vehicle.parkedAt ? new Date(vehicle.parkedAt as any).toLocaleTimeString() : ''}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {vehicles.length === 0 && (
-                <p className="text-center text-muted-foreground text-sm mt-4">
-                  No vehicles parked yet. When attendees save their parking locations, they'll appear here.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Parking zones */}
         <motion.div

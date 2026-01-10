@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Shield, Mail, Lock, Eye, EyeOff, LayoutDashboard, ArrowLeft } from "lucide-react";
-// import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-// import { saveUserRole } from "@/lib/db";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function AdminAuth() {
     const navigate = useNavigate();
@@ -18,9 +19,8 @@ export default function AdminAuth() {
         password: "",
     });
 
-    // Hardcoded admin credentials
+    // Admin credentials (must also exist in Firebase Auth)
     const ADMIN_EMAIL = "admin@crowdsafe.com";
-    const ADMIN_PASSWORD = "asdfghjkl;";
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -31,18 +31,27 @@ export default function AdminAuth() {
         setIsLoading(true);
 
         try {
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            // Validate hardcoded credentials
-            if (formData.email === ADMIN_EMAIL && formData.password === ADMIN_PASSWORD) {
-                toast.success("Welcome back! Redirecting to Admin Panel...");
-                navigate("/admin");
-            } else {
-                toast.error("Authentication failed", { description: "Invalid email or password" });
+            // First check if it's the admin email
+            if (formData.email !== ADMIN_EMAIL) {
+                toast.error("Access Denied", { description: "This login is for administrators only" });
+                setIsLoading(false);
+                return;
             }
+
+            // Sign in with Firebase Auth
+            await signInWithEmailAndPassword(auth, formData.email, formData.password);
+
+            toast.success("Welcome back! Redirecting to Admin Panel...");
+            navigate("/admin");
         } catch (error: any) {
             console.error(error);
-            toast.error("Authentication failed", { description: error.message });
+            if (error.code === "auth/user-not-found") {
+                toast.error("Admin account not found", { description: "Please create an admin account first" });
+            } else if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+                toast.error("Authentication failed", { description: "Invalid password" });
+            } else {
+                toast.error("Authentication failed", { description: error.message });
+            }
         } finally {
             setIsLoading(false);
         }
@@ -103,8 +112,6 @@ export default function AdminAuth() {
                     </motion.form>
                 </div>
             </div>
-
-
 
             {/* Visual */}
             <div className="hidden lg:flex flex-1 relative overflow-hidden">
