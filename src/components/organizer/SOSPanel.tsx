@@ -66,9 +66,11 @@ export function SOSPanel() {
 
         setIsSending(true);
         try {
+            // Get API URL from environment variable, fallback to localhost for development
+            const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
             // Updated Flow: Delegate all SOS logic (Alert Creation + Email) to Backend
-            const response = await fetch("http://localhost:5000/api/send-sos", {
+            const response = await fetch(`${API_URL}/api/send-sos`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -83,6 +85,7 @@ export function SOSPanel() {
                 const errData = await response.json();
                 throw new Error(errData.message || "Backend failed to process SOS");
             }
+
 
             const result = await response.json();
             console.log("SOS Broadcast Result:", result);
