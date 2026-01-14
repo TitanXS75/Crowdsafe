@@ -277,6 +277,11 @@ This project is developed for the **GDGoC GHRCE Hackathon**.
 
 **VisionAI - SocialTech Track**
 
+- **Himanshu Kejdiwal** - [LinkedIn](https://www.linkedin.com/in/himanshu-kejdiwal-1477182b3?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app)
+- **Rohit Sable** - [LinkedIn](https://www.linkedin.com/in/rohit-sable-9b8164321?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app)
+- **Sarthak Sontakke** - [LinkedIn](https://www.linkedin.com/in/sarthak-p-sontakke-251a09263?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app)
+- **Divya Pagrani** - [LinkedIn](https://www.linkedin.com/in/divya-pagrani?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app)
+
 ---
 
 <div align="center">
